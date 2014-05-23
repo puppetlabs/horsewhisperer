@@ -4,10 +4,10 @@
 
 The HorseWhisperer is a command line parser and chained execution framework written in C++ (11).
 
-(The Horse Whisperper should not be considered as a replacement for a commandline flags processing
+(The Horse Whisperer should not be considered as a replacement for a commandline flags processing
 library like [gflags](https://code.google.com/p/gflags/), but instead be used in the
-special case where your application will be performing consecutive (and independant)
-actions and context sensitive commandline arguments are desired.)
+special case where your application will be performing consecutive (and independent)
+actions and context sensitive command line arguments are desired.)
 
 ## How do I even?
 
@@ -159,7 +159,7 @@ can be long so it is worth looking at it in detail.
 **action_name:** The name of the action. This name will always be used to refer to the action during the life of your
 application.
 
-**arity:** Arity is the amount of parameters expected by the action. Arity can either be a positive or negative integer, both being interpreted slightly differently. A positive integer means that the action expects *exactly* that many parameters (if arity is passed as 3 then we will attempt to pass exactly 3 paramters to the action.) If arity is negative it means that the action expects *at least* that many parameters (if arity is passed as -3 it means that we will attempt to pass at least 3 parameters to the action, but all parameters will be processed and passed until either **the end of ARGV** or **a delimiting symbol** is reached.)
+**arity:** Arity is the amount of parameters expected by the action. Arity can either be a positive or negative integer, both being interpreted slightly differently. A positive integer means that the action expects *exactly* that many parameters (if arity is passed as 3 then we will attempt to pass exactly 3 parameters to the action.) If arity is negative it means that the action expects *at least* that many parameters (if arity is passed as -3 it means that we will attempt to pass at least 3 parameters to the action, but all parameters will be processed and passed until either **the end of ARGV** or **a delimiting symbol** is reached.)
 
 **chainable:** This boolean value defines whether an action can be chained with other actions or not.
 
