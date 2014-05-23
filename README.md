@@ -1,8 +1,8 @@
 # Horse Whisperer
 
-### Smart and whitty opening paragraph goes here
+## Wait, what?
 
-Enter the Horse Whisperer. He'll tell your actions what to do!
+The HorseWhisperer is a command line parser and chained execution framework written in C++ (11).
 
 (The Horse Whisperper should not be considered as a replacement for a commandline flags processing
 library like [gflags](https://code.google.com/p/gflags/), but instead be used in the
