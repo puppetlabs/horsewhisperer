@@ -32,13 +32,11 @@ bool validation(int x) {
     return true;
 }
 
-// help callback
-void gallop_help(std::string command_name) {
-    std::cout << "The horses, they be a galloping" << std::endl;
-}
+// help message
+std::string gallop_help = "The horses, they be galloping\n";
 
 // action callback
-int gallop(std::string command_name, std::vector<std::string> arguments) {
+int gallop(std::vector<std::string> arguments) {
     for (int i = 0; i < GetFlag<int>("ponies"); i++) {
         if (!GetFlag<int>("tired")) {
             std::cout << "Galloping into the night!" << std::endl;
