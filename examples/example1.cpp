@@ -33,7 +33,7 @@ bool validation(int x) {
 }
 
 // help message
-std::string gallop_help = "The horses, they be galloping\n";
+std::string gallop_help = "The horses, they be a galloping\n";
 
 // action callback
 int gallop(std::vector<std::string> arguments) {
