@@ -11,10 +11,17 @@
 #include <cctype>
 #include <algorithm>
 #include <functional>
+#include <memory>
+// To disable assert()
+#define NDEBUG
+#include <cassert>
+
 
 namespace HorseWhisperer {
 
 static const std::string VERSION_STRING = "0.1.0";
+static const int GLOBAL_CONTEXT_IDX = 0;
+static const int NO_CONTEXT_IDX = -1;
 
 using ActionCallback = std::function<int(std::vector<std::string> args)>;
 
@@ -77,18 +84,13 @@ struct Action {
 };
 
 struct Context {
-    ~Context() {
-        for (auto& flag : flags) {
-            if (flag.second) {
-                delete flag.second;
-            }
-        }
-    }
     std::map<std::string, FlagBase*> flags; // Flags defined for the given context
-    Context *next; // Pointer to the next context structure
     Action* action; // What this context is doing
     std::vector<std::string> arguments;
 };
+
+typedef std::unique_ptr<Context> ContextPtr;
+
 
 // Because regex is busted on a lot of versions of libstdc++ I'm rolling
 // my own integer validation.
@@ -112,11 +114,11 @@ class HorseWhisperer {
     // No args constructor creates the pointer to the root context and implicitly
     // declares the --help flag.
     HorseWhisperer() {
-        global_context_ = new Context();
-        global_context_->next = nullptr;
-        global_context_->action = nullptr;
-        current_context_ = global_context_;
-        defineGlobalFlag<bool>("h help", "Shows this message.", false, nullptr);
+        ContextPtr global_context {new Context()};
+        global_context->action = nullptr;
+        context_mgr.push_back(std::move(global_context));
+        current_context_idx = GLOBAL_CONTEXT_IDX;
+        defineGlobalFlag<bool>("h help", "Shows this message", false, nullptr);
         defineGlobalFlag<int>("vlevel", "", 0, nullptr);
         defineGlobalFlag<bool>("verbose", "Set verbose output", false, [this](bool) {setFlag<int>("vlevel", 1); return true;});
     }
@@ -138,6 +140,13 @@ class HorseWhisperer {
         delimiters_ = delimiters;
     }
 
+    bool isDelimiter(const char* argument) {
+        if (std::find(delimiters_.begin(), delimiters_.end(), argument) != delimiters_.end()) {
+            return true;
+        }
+        return false;
+    }
+
     bool parse(int argc, char* argv[]) {
         for (int i = 1; i < argc; i++) {
             // Identify if it's a flag
@@ -148,19 +157,20 @@ class HorseWhisperer {
                 if (abort_parse_) {
                     return true;
                 }
-            } else if (std::find(delimiters_.begin(), delimiters_.end(), argv[i]) != delimiters_.end()) { // skip over delimiter
+            } else if (isDelimiter(argv[i])) { // skip over delimiter
                 continue;
             } else {
                 std::string action = argv[i];
                 if (isActionDefined(action)) {
-                    Context* action_context = new Context();
-                    current_context_->next = action_context;
-                    action_context->next = nullptr;
+                    ContextPtr action_context {new Context()};
                     action_context->flags = actions[argv[i]]->flags;
                     action_context->action = actions[argv[i]];
-                    current_context_ = action_context;
+                    context_mgr.push_back(std::move(action_context));
+                    current_context_idx++;
 
-                    int arity = action_context->action->arity;
+                    assert(current_context_idx == context_mgr.size() - 1);
+
+                    int arity = context_mgr[current_context_idx]->action->arity;
                     // parse parameters
                     if (arity > 0) { // iff read parameters = arity
                         for (; arity > 0; arity--) {
@@ -185,12 +195,12 @@ class HorseWhisperer {
                                           << ". Found delimiter: " << argv[i] << std::endl;
                                 return false;
                             } else {
-                                 action_context->arguments.push_back(argv[i]);
+                                 context_mgr[current_context_idx]->arguments.push_back(argv[i]);
                             }
                         }
                         if (arity > 0) {
-                            std::cout << "Expected " << action_context->action->arity << " parameters"
-                                      << " for action " << action << ". Only read " << action_context->action->arity - arity
+                            std::cout << "Expected " << context_mgr[current_context_idx]->action->arity << " parameters"
+                                      << " for action " << action << ". Only read " << context_mgr[current_context_idx]->action->arity - arity
                                       << "." << std::endl;
                                       return false;
                         }
@@ -207,13 +217,13 @@ class HorseWhisperer {
                                     return true;
                                 }
                             }else {
-                                action_context->arguments.push_back(argv[i]);
+                                context_mgr[current_context_idx]->arguments.push_back(argv[i]);
                                 --arity;
                             }
                         } while (argv[i+1] && std::find(delimiters_.begin(), delimiters_.end(), argv[i+1]) == delimiters_.end());
                         if (arity > 0) {
-                            std::cout << "Expected " << action_context->action->arity << " parameters"
-                                      << " for action " << action << ". Only read " << action_context->action->arity - arity
+                            std::cout << "Expected " << context_mgr[current_context_idx]->action->arity << " parameters"
+                                      << " for action " << action << ". Only read " << context_mgr[current_context_idx]->action->arity - arity
                                       << "." << std::endl;
                                       return false;
                         }
@@ -233,7 +243,7 @@ class HorseWhisperer {
     // specific flags
     void help() {
         abort_parse_ = true;
-        if (current_context_->action) {
+        if (context_mgr[current_context_idx]->action) {
             actionHelp();
         } else {
             globalHelp();
@@ -245,18 +255,21 @@ class HorseWhisperer {
             return true;
         }
 
-        current_context_ = global_context_;
+        current_context_idx = GLOBAL_CONTEXT_IDX - 1;
         bool previous_result = true;
-        if (current_context_->next) {
-            while ((current_context_ = current_context_->next)) {
-                if (current_context_->action) {
+
+        if (context_mgr.size() > 1) {
+            for (auto & context : context_mgr) {
+
+                current_context_idx++;
+                if (context->action) {
                     if (!previous_result) {
-                        std::cout << "Not starting action '" << current_context_->action->name
+                        std::cout << "Not starting action '" << context->action->name
                                   << "'. Previous action failed to complete successfully." << std::endl;
                     } else {
                         // Flip it because success is 0
-                        previous_result = !current_context_->action->action_callback(current_context_->arguments);
-                        if (!current_context_->action->chainable) {
+                        previous_result = !context->action->action_callback(context->arguments);
+                        if (!context->action->chainable) {
                             return !previous_result;
                         }
                     }
@@ -282,7 +295,7 @@ class HorseWhisperer {
         while (iss) {
             std::string tmp;
             iss >> tmp;
-            global_context_->flags[tmp] = flagp;
+            context_mgr[GLOBAL_CONTEXT_IDX]->flags[tmp] = flagp;
         }
 
         // vlevel is special and we don't want it showing up in the help list
@@ -323,8 +336,9 @@ class HorseWhisperer {
 
     template <typename FlagType>
     FlagType getFlagValue(std::string name) {
-        if (Context* context = definedInContext(name)) {
-            return static_cast<Flag<FlagType>*>(context->flags[name])->value;
+        int context_idx = getContextIdxIfDefined(name);
+        if (context_idx != NO_CONTEXT_IDX) {
+            return static_cast<Flag<FlagType>*>(context_mgr[context_idx]->flags[name])->value;
         }
 
         return FlagType();
@@ -333,9 +347,9 @@ class HorseWhisperer {
     // ALSO check both contexts
     template <typename FlagType>
     bool setFlag(std::string name, FlagType value) {
-        Context* context = definedInContext(name);
-        if (context) {
-            Flag<FlagType>* flagp = static_cast<Flag<FlagType>*>(context->flags[name]);
+        int context_idx = getContextIdxIfDefined(name);
+        if (context_idx != NO_CONTEXT_IDX) {
+            Flag<FlagType>* flagp = static_cast<Flag<FlagType>*>(context_mgr[context_idx]->flags[name]);
             FlagType tmp_value = flagp->value;
             flagp->value = value;
 
@@ -352,8 +366,8 @@ class HorseWhisperer {
     };
 
   private:
-    Context* global_context_;
-    Context* current_context_;
+    int current_context_idx;
+    std::vector<ContextPtr> context_mgr;
     std::map<std::string, Action*> actions;
     std::map<std::string, std::vector<FlagBase*>> registered_flags_;
     bool parsed_ = false;
@@ -401,7 +415,8 @@ class HorseWhisperer {
             return false;
         }
 
-        FlagBase* flagp = definedInContext(flagname)->flags[flagname];
+        int context_idx = getContextIdxIfDefined(flagname);
+        FlagBase* flagp = context_mgr[context_idx]->flags[flagname];
 
         // RTTI to determine how set the flag value
         if (dynamic_cast<Flag<bool>*>(flagp)) {
@@ -465,17 +480,17 @@ class HorseWhisperer {
 
     // Display help information for the current action context
     void actionHelp() {
-        if (current_context_->action->help_string_.empty()) {
-            std::cout << "No specific help found for action :" << current_context_->action->name
+        if (context_mgr[current_context_idx]->action->help_string_.empty()) {
+            std::cout << "No specific help found for action :" << context_mgr[current_context_idx]->action->name
                       << std::endl << std::endl;
             return;
         }
 
-        std::cout << current_context_->action->help_string_;
+        std::cout << context_mgr[current_context_idx]->action->help_string_;
 
-        if (registered_flags_.find(current_context_->action->name) != registered_flags_.end()) {
-            std::cout << std::endl << "  " << current_context_->action->name << " specific flags:" << std::endl;
-            for (const auto& flag : registered_flags_[current_context_->action->name]) {
+        if (registered_flags_.find(context_mgr[current_context_idx]->action->name) != registered_flags_.end()) {
+            std::cout << std::endl << "  " << context_mgr[current_context_idx]->action->name << " specific flags:" << std::endl;
+            for (const auto& flag : registered_flags_[context_mgr[current_context_idx]->action->name]) {
                 writeFlagHelp(flag);
             }
         }
@@ -514,20 +529,20 @@ class HorseWhisperer {
     }
 
     bool isFlagDefined(std::string name) {
-        if (definedInContext(name)) {
+        if (getContextIdxIfDefined(name) != NO_CONTEXT_IDX) {
             return true;
         } else {
             return false;
         }
     }
 
-    Context* definedInContext(std::string name) {
-        if (current_context_->flags.find(name) != current_context_->flags.end()) {
-            return current_context_;
-        } else if (global_context_->flags.find(name) != global_context_->flags.end()) {
-            return global_context_;
+    int getContextIdxIfDefined(std::string name) {
+        if (context_mgr[current_context_idx]->flags.find(name) != context_mgr[current_context_idx]->flags.end()) {
+            return current_context_idx;
+        } else if (context_mgr[GLOBAL_CONTEXT_IDX]->flags.find(name) != context_mgr[GLOBAL_CONTEXT_IDX]->flags.end()) {
+            return GLOBAL_CONTEXT_IDX;
         } else {
-            return nullptr;
+            return NO_CONTEXT_IDX;
         }
     }
 
