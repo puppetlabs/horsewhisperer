@@ -41,7 +41,7 @@ When first referencing the singleton three flags will be created for you by defa
 all the defined flags and actions.
 
     $ myprog --help
-      --help                      Shows this message.
+      --help                      Shows this message
       --verbose                   Set verbose output
       --version                   Display version information
 
@@ -80,7 +80,7 @@ will change the banner message to
 
     $ myprog --help
     Usage: myprog [global options] <action> [options]
-      --help                      Shows this message.
+      --help                      Shows this message
       --verbose                   Set verbose output
       --version                   Display version information
 
@@ -96,7 +96,8 @@ will change the version message to
     MyProg version - 0.1.0
 
 Finally, a word on delimiters. By default Horse Whisperer has no delimiting symbols and chaining commands
-is done simply by following up one command with another. There are certain cases where this behaviour is not optimal, so it is posible to define delimitors with the *SetDelimters* function.
+is done simply by following up one command with another. There are certain cases where this behaviour is not optimal, so it is posible to define delimitors with the *SetDelimters* function. Note that it is not advised to use a dash as
+a delimeter; dashes are used to identify flags.
 
     // void SetDelimiters(std::vector<std::string> delimiters)
     SetDelimiters(std::vector<std::string>{"+", ";", "_then"});
@@ -153,8 +154,8 @@ can be long so it is worth looking at it in detail.
                              int arity,
                              bool chainable,
                              std::string description,
-                             std::function<void(std::string command_name)> help_callback,
-                             std::function<int(std::string command_name, std::vector<std::string> args action_callback)>
+                             std::string help_string,
+                             std::function<int(std::vector<std::string> args action_callback)>
 
 **action_name:** The name of the action. This name will always be used to refer to the action during the life of your
 application.
@@ -165,22 +166,16 @@ application.
 
 **description:** Short description which will be displayed when the --help flag is used.
 
-**help_callback:** If `--help` is set in the context of an action instead of the global context the help callback
-function will be called. The function's return type is void and a single parameter will be passed to it, a `std::string`
-with the name of action.
+**help_string:** If `--help` is set in the context of an action instead of the global context the help string
+function will be displayed.
 
 **action_callback:** Here we have the meat of the action. This is the function that will be called when the action has
 been parsed from the commandline and invoked by running the HorseWhisperer::Start() function. The action
-callback is expected to return an int (like a main function would) and will be passed two parameters: a `std::string`
-with the name of the action and a `std::vector<std::string>` which will contain the arguments passed to the action.
-
-    // help callback
-    void gallop_help(std::string command_name) {
-        std::cout << "The horses, they be a galloping" << std::endl;
-    }
+callback is expected to return an int (like a main function would) and will be passed a `std::vector<std::string>` parameter
+which will contain the arguments passed to the action.
 
     // action callback
-    int gallop(std::string command_name, std::vector<std::string> arguments) {
+    int gallop(std::vector<std::string> arguments) {
         for (int i = 0; i < GetFlag<int>("ponies"); i++) {
             std::cout << "Galloping into the night!" << std::endl;
         }
@@ -189,13 +184,14 @@ with the name of the action and a `std::vector<std::string>` which will contain 
 
     ...
 
-    HorseWhisperer::DefineAction("gallop", 0, false, "make the ponies gallop", gallop_help, gallop);
+    HorseWhisperer::DefineAction("gallop", 0, false, "make the ponies gallop",
+                                 "The horses, they be a galloping", gallop);
 
 This will change `--help` output to
 
     $ myprog --help
     Usage: myprog [global options] <action> [options]
-      --help                      Shows this message.
+      --help                      Shows this message
       --verbose                   Set verbose output
       --version                   Display version information
       --ponies                    all the ponies
@@ -257,7 +253,21 @@ Then when looking at `--help`
 
     copy action options:
 
-      -tired                      are the horses tired?
+      --tired                     are the horses tired?
+
+To use the --tired flag, we add some logic in the action callback:
+
+    // action callback
+    int gallop(std::vector<std::string> arguments) {
+        for (int i = 0; i < GetFlag<int>("ponies"); i++) {
+            if (!GetFlag<int>("tired")) {
+                std::cout << "Galloping into the night!" << std::endl;
+            } else {
+                std::cout << "The pony is too tired to gallop." << std::endl;
+            }
+        }
+        return 0;
+    }
 
 When trying to set `--tired` outside of the gallop action's context a failure will occur.
 
@@ -266,8 +276,8 @@ When trying to set `--tired` outside of the gallop action's context a failure wi
 
 But when set inside the context of `gallop`
 
-    $ myprog gallop --tried
-    Galloping into the night!
+    $ myprog gallop --tired
+    The pony is too tired to gallop.
 
 ### Parsing commandline arguments
 
