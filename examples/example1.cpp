@@ -49,7 +49,8 @@ int gallop(std::vector<std::string> arguments) {
 
 int main(int argc, char* argv[]) {
     // Configuring the global context
-    SetHelpBanner("Usage: myprog [global options] <action> [options]");
+    SetHelpBanner("Usage: MyProg [global options] <action> [options]");
+    SetAppName("MyProg");
     SetVersion("MyProg version - 0.1.0\n");
     SetDelimiters(std::vector<std::string>{"+", ";", "_then"});
 
