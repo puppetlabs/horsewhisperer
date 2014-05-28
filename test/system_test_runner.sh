@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-#     system_testr_unner.sh
+#     system_test_runner.sh
 #     =====================
 #
 #     Script to automate the execution of a few simple system tests
@@ -10,9 +10,14 @@
 
 # exit codes
 EXIT_FAILURE=1
+EXIT_MISSING_EXECUTABLE=3
 
 # executable of example1.cpp
 EXAMPLE=../examples/example
+
+if [ ! -e ${EXAMPLE} ]; then
+  exit $EXIT_MISSING_EXECUTABLE
+fi
 
 check_strings() {
   if [ "$1" != "$2" ]; then
