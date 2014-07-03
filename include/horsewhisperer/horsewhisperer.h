@@ -148,23 +148,23 @@ class HorseWhisperer {
     }
 
     bool parse(int argc, char* argv[]) {
-        for (int i = 1; i < argc; i++) {
+        for (int arg_idx = 1; arg_idx < argc; arg_idx++) {
             // Identify if it's a flag
-            if (argv[i][0] == '-') {
-                if (!parseFlag(argv, i)) {
+            if (argv[arg_idx][0] == '-') {
+                if (!parseFlag(argv, arg_idx)) {
                     return false;
                 }
                 if (abort_parse_) {
                     return true;
                 }
-            } else if (isDelimiter(argv[i])) { // skip over delimiter
+            } else if (isDelimiter(argv[arg_idx])) { // skip over delimiter
                 continue;
             } else {
-                std::string action = argv[i];
+                std::string action = argv[arg_idx];
                 if (isActionDefined(action)) {
                     ContextPtr action_context {new Context()};
-                    action_context->flags = actions[argv[i]]->flags;
-                    action_context->action = actions[argv[i]];
+                    action_context->flags = actions[argv[arg_idx]]->flags;
+                    action_context->action = actions[argv[arg_idx]];
                     context_mgr.push_back(std::move(action_context));
                     current_context_idx++;
 
@@ -174,11 +174,11 @@ class HorseWhisperer {
                     // parse parameters
                     if (arity > 0) { // iff read parameters = arity
                         for (; arity > 0; arity--) {
-                            ++i;
-                            if (argv[i] == nullptr) { // have we run out of tokens?
+                            ++arg_idx;
+                            if (argv[arg_idx] == nullptr) { // have we run out of tokens?
                                 break;
-                            } else if (argv[i][0] == '-') { // is it a flag token?
-                                if (!parseFlag(argv, i)) {
+                            } else if (argv[arg_idx][0] == '-') { // is it a flag token?
+                                if (!parseFlag(argv, arg_idx)) {
                                     return false;
                                 }
                                 if (abort_parse_) {
@@ -186,50 +186,64 @@ class HorseWhisperer {
                                     // are found, we terminate the parse process.
                                     return true;
                                 }
-                            } else if (isActionDefined(argv[i])) { // is it an action?
+                            } else if (isActionDefined(argv[arg_idx])) { // is it an action?
                                 std::cout << "Expected parameter for action: " << action
-                                          << ". Found action: " << argv[i] << std::endl;
+                                          << ". Found action: " << argv[arg_idx] << std::endl;
                                 return false;
-                            } else if (std::find(delimiters_.begin(), delimiters_.end(), argv[i]) != delimiters_.end()) { // is it a delimiter?
+                            } else if (std::find(delimiters_.begin(), delimiters_.end(),
+                                                 argv[arg_idx]) != delimiters_.end()) { // is it a delimiter?
                                 std::cout << "Expected parameter for action: " << action
-                                          << ". Found delimiter: " << argv[i] << std::endl;
+                                          << ". Found delimiter: " << argv[arg_idx] << std::endl;
                                 return false;
                             } else {
-                                 context_mgr[current_context_idx]->arguments.push_back(argv[i]);
+                                 context_mgr[current_context_idx]->arguments.push_back(argv[arg_idx]);
                             }
                         }
                         if (arity > 0) {
-                            std::cout << "Expected " << context_mgr[current_context_idx]->action->arity << " parameters"
-                                      << " for action " << action << ". Only read " << context_mgr[current_context_idx]->action->arity - arity
+                            std::cout << "Expected " << context_mgr[current_context_idx]->action->arity
+                                      << " parameters for action " << action << ". Only read "
+                                      << context_mgr[current_context_idx]->action->arity - arity
                                       << "." << std::endl;
-                                      return false;
+                            return false;
                         }
                     } else if (arity < 0) { // if read parameters at least = arity
                         // When arity is an "at least" representation we eat arguments
                         // until we either run out or until we hit a delimiter.
+
+                        if (arg_idx >= argc - 1) {
+                            std::cout << "No arguments specified for " << action << ".\n";
+                            return false;
+                        }
+
+                        int abs_arity { -arity };
+
                         do {
-                            ++i;
-                            if (argv[i][0] == '-') {
-                                if (!parseFlag(argv, i)) {
+                            ++arg_idx;
+                            if (argv[arg_idx][0] == '-') {
+                                if (!parseFlag(argv, arg_idx)) {
                                     return false;
                                 }
                                 if (abort_parse_) {
                                     return true;
                                 }
                             }else {
-                                context_mgr[current_context_idx]->arguments.push_back(argv[i]);
-                                --arity;
+                                context_mgr[current_context_idx]->arguments.push_back(argv[arg_idx]);
+                                --abs_arity;
                             }
-                        } while (argv[i+1] && std::find(delimiters_.begin(), delimiters_.end(), argv[i+1]) == delimiters_.end());
-                        if (arity > 0) {
-                            std::cout << "Expected " << context_mgr[current_context_idx]->action->arity << " parameters"
-                                      << " for action " << action << ". Only read " << context_mgr[current_context_idx]->action->arity - arity
+                        } while (argv[arg_idx+1] && std::find(delimiters_.begin(), delimiters_.end(),
+                                                              argv[arg_idx+1]) == delimiters_.end());
+
+                        if (abs_arity > 0) {
+                            auto expected_arity = -context_mgr[current_context_idx]->action->arity;
+                            std::cout << "Expected at least " << expected_arity
+                                      << " parameters for action " << action << ". Only read "
+                                      << expected_arity - abs_arity
                                       << "." << std::endl;
                                       return false;
                         }
                     }
                 } else {
-                    std::cout << "Unknown action: " << argv[i] << std::endl;
+                    std::cout << "Unknown action: " << argv[arg_idx] << std::endl;
                     return false;
                 }
             }
