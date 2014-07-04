@@ -17,6 +17,7 @@
         ./example gallop --ponies 5
         ./example gallop --ponies 6
         ./example gallop --ponies 5 --tired
+        ./example trot 'elegant dancer' 'drunk panda'
 */
 #include "../include/horsewhisperer/horsewhisperer.h"
 #include <string>
@@ -32,10 +33,11 @@ bool validation(int x) {
     return true;
 }
 
-// help message
+// help messages
 std::string gallop_help = "The horses, they be a galloping\n";
+std::string trot_help = "The horses, they be trotting in some way\n";
 
-// action callback
+// gallop callback
 int gallop(std::vector<std::string> arguments) {
     for (int i = 0; i < GetFlag<int>("ponies"); i++) {
         if (!GetFlag<int>("tired")) {
@@ -43,6 +45,14 @@ int gallop(std::vector<std::string> arguments) {
         } else {
             std::cout << "The pony is too tired to gallop." << std::endl;
         }
+    }
+    return 0;
+}
+
+// trot callback
+int trot(std::vector<std::string> arguments) {
+    for (auto mode : arguments) {
+        std::cout << "Trotting like a " << mode << std::endl;
     }
     return 0;
 }
@@ -57,8 +67,19 @@ int main(int argc, char* argv[]) {
     // Define global flags
     DefineGlobalFlag<int>("ponies", "all the ponies", 1, validation);
 
+    // Define action: gallop
     DefineAction("gallop", 0, false, "make the ponies gallop", gallop_help, gallop);
     DefineActionFlag<bool>("gallop", "tired", "are the horses tired?", false, nullptr);
-    Parse(argc, argv);
+
+    // Define action: trot (at least two arguments are required)
+    DefineAction("trot", -2, false, "make the ponies trot in some way", trot_help, trot);
+
+    // Parse command line arguments
+    if (!Parse(argc, argv)) {
+        std::cout << "Failed to parse the command line input.\n";
+        return 1;
+    }
+
+    // Start execution
     return Start();
 }

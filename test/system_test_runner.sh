@@ -25,6 +25,12 @@ check_strings() {
   fi
 }
 
+check_num_lines() {
+  if [ $1 -ne $2 ]; then
+    exit $EXIT_FAILURE
+  fi
+}
+
 # help: we expect the usage message
 USAGE_LABEL=`"$EXAMPLE" --help | head -n 1 | awk '{print $1}'`
 check_strings "$USAGE_LABEL" 'Usage:'
@@ -39,10 +45,22 @@ check_strings "$ACTION_MSG" 'Galloping'
 
 # global flag: we expect the above message 4 times
 MSG_NUM=`"$EXAMPLE" gallop --ponies 4 | awk '{ if ( $1 ~ /Galloping/ ) {print $1} }' | wc -l`
-if [ $MSG_NUM -ne 4 ]; then
-  exit $EXIT_FAILURE
-fi
+check_num_lines $MSG_NUM 4
 
 # action flag: we expect a different message from the action callback
 TIRED_MSG=`"$EXAMPLE" gallop --tired`
 check_strings "$TIRED_MSG" 'The pony is too tired to gallop.'
+
+# no action arguments specified: we expect an error message
+ARG_ERROR=`"$EXAMPLE" trot`
+check_strings "$ARG_ERROR" '''No arguments specified for trot.
+Failed to parse the command line input.'''
+
+# not all action arguments specified: we expect an error message
+ARG_ERROR=`"$EXAMPLE" trot foo`
+check_strings "$ARG_ERROR" '''Expected at least 2 parameters for action trot. Only read 1.
+Failed to parse the command line input.'''
+
+# action arguments: we expect it works with at least 2 arguments
+TROT_MSG_NUM=`"$EXAMPLE" trot 'world champion' panda rhino | grep Trotting | wc -l`
+check_num_lines $TROT_MSG_NUM 3
