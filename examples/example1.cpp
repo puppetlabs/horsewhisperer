@@ -17,10 +17,11 @@
         ./example gallop --ponies 5
         ./example gallop --ponies 6
         ./example gallop --ponies 5 --tired
-        ./example trot 'elegant dancer' 'drunk panda'
+        ./example trot 'mode elegant dancer' 'mode drunk panda'
 */
 #include "../include/horsewhisperer/horsewhisperer.h"
 #include <string>
+#include <vector>
 
 using namespace HorseWhisperer;
 
@@ -35,10 +36,10 @@ bool validation(int x) {
 
 // help messages
 std::string gallop_help = "The horses, they be a galloping\n";
-std::string trot_help = "The horses, they be trotting in some way\n";
+std::string trot_help = "The horses, they be trotting in some 'mode ...'\n";
 
-// gallop callback
-int gallop(std::vector<std::string> arguments) {
+// gallop: action callback
+int gallop(const Arguments& arguments) {
     for (int i = 0; i < GetFlag<int>("ponies"); i++) {
         if (!GetFlag<int>("tired")) {
             std::cout << "Galloping into the night!" << std::endl;
@@ -49,12 +50,36 @@ int gallop(std::vector<std::string> arguments) {
     return 0;
 }
 
-// trot callback
-int trot(std::vector<std::string> arguments) {
-    for (auto mode : arguments) {
-        std::cout << "Trotting like a " << mode << std::endl;
+// trot: internal function to process arguments
+bool processTrotArguments_(const std::vector<std::string>& cl_arguments,
+                           std::vector<std::string>& processed_arguments){
+    for (std::string arg : cl_arguments) {
+        if (arg.find("mode", 0) == std::string::npos) {
+            std::cout << "Error: invalid trot argument " << arg << ".\n";
+            return false;
+        } else {
+            processed_arguments.push_back(arg.substr(5));
+        }
     }
-    return 0;
+    return true;
+}
+
+// trot: arguments callback
+bool trotArgumentsCallback(const std::vector<std::string>& arguments) {
+    std::vector<std::string> processed_args {};
+    return processTrotArguments_(arguments, processed_args);
+}
+
+// trot: action callback
+int trot(const std::vector<std::string>& arguments) {
+    std::vector<std::string> processed_args {};
+    if (processTrotArguments_(arguments, processed_args)) {
+        for (std::string mode : processed_args) {
+            std::cout << "Trotting like a " << mode << std::endl;
+        }
+        return 0;
+    }
+    return 1;
 }
 
 int main(int argc, char* argv[]) {
@@ -68,15 +93,22 @@ int main(int argc, char* argv[]) {
     DefineGlobalFlag<int>("ponies", "all the ponies", 1, validation);
 
     // Define action: gallop
-    DefineAction("gallop", 0, false, "make the ponies gallop", gallop_help, gallop);
+    DefineAction("gallop", 0, true, "make the ponies gallop", gallop_help, gallop);
     DefineActionFlag<bool>("gallop", "tired", "are the horses tired?", false, nullptr);
 
     // Define action: trot (at least two arguments are required)
-    DefineAction("trot", -2, false, "make the ponies trot in some way", trot_help, trot);
+    DefineAction("trot", -2, true, "make the ponies trot in some way", trot_help,
+                 trot, trotArgumentsCallback);
 
-    // Parse command line arguments
+    // Parse command line: global flags, action arguments, and action flags
     if (!Parse(argc, argv)) {
         std::cout << "Failed to parse the command line input.\n";
+        return 1;
+    }
+
+    // Process and validate action arguments
+    if (!ValidateActionArguments()) {
+        std::cout << "Failed to validate the action arguments.\n";
         return 1;
     }
 

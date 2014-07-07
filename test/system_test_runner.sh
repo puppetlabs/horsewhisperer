@@ -57,10 +57,25 @@ check_strings "$ARG_ERROR" '''No arguments specified for trot.
 Failed to parse the command line input.'''
 
 # not all action arguments specified: we expect an error message
-ARG_ERROR=`"$EXAMPLE" trot foo`
+ARG_ERROR=`"$EXAMPLE" trot 'mode foo'`
 check_strings "$ARG_ERROR" '''Expected at least 2 parameters for action trot. Only read 1.
 Failed to parse the command line input.'''
 
-# action arguments: we expect it works with at least 2 arguments
-TROT_MSG_NUM=`"$EXAMPLE" trot 'world champion' panda rhino | grep Trotting | wc -l`
+# action arguments: we expect it works with at least 2 correct arguments
+TROT_MSG_NUM=`"$EXAMPLE" trot 'mode world champion' 'mode panda' 'mode rhino' | grep Trotting | wc -l`
 check_num_lines $TROT_MSG_NUM 3
+
+# invalid action arguments: we expect a validation error
+INVALID_ARG_ERROR=`"$EXAMPLE" trot 'mode world champion' panda`
+check_strings "$INVALID_ARG_ERROR" '''Error: invalid trot argument panda.
+Failed to validate the action arguments.'''
+
+# invalid action arguments: we expect a validation error when chaining
+INVALID_ARG_ERROR=`"$EXAMPLE" gallop + trot 'mode world champion' 'panda way' --ponies 3`
+check_strings "$INVALID_ARG_ERROR" '''Error: invalid trot argument panda way.
+Failed to validate the action arguments.'''
+
+# chaining works
+CHAINING_MSG=`"$EXAMPLE" gallop + trot 'mode one' 'mode two' 'mode three' --ponies 4`
+check_num_lines `echo "$CHAINING_MSG" | grep Galloping | wc -l` 4
+check_num_lines `echo "$CHAINING_MSG" | grep Trotting | wc -l` 3

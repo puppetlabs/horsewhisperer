@@ -11,13 +11,14 @@ actions and context sensitive command line arguments are desired.)
 
 ## How do I even?
 
-Using The Horse Whisperer comes down to 6 steps
+Using The Horse Whisperer comes down to 7 steps
 
  * Optionally configuring the global context
  * Defining global flags
  * Defining a set of actions
  * Defining action specific flags
- * Parsing the commandline arguments
+ * Parsing the commandline (global flags, actions, action flags, and arguments)
+ * Validating action arguments
  * Executing actions
 
 ### Before we begin
@@ -110,7 +111,7 @@ Global context flags can be defined with the `DefineGlobalFlag` templated functi
     void DefineGlobalFlag(std::string aliases,
                           std::string description,
                           FlagType default_value,
-                          std::function<bool(FlagType)> validation_callback)
+                          std::function<bool(FlagType)> flag_callback)
 
 **aliases:** Combination of short and long names, space separated, which can be used to set and look up the flag.
 
@@ -118,7 +119,7 @@ Global context flags can be defined with the `DefineGlobalFlag` templated functi
 
 **default_value:** Default value of the flag which is set.
 
-**validation_callback:** The validation callback will be called when the flag is set. This can be any function
+**flag_callback:** This is the flag validation callback and it will be called when the flag is set. This can be any function
 you provide and it doesn't necessarily have to be used for validation. Be aware that the function will be expected
 to return a boolean value. If false is returned the flag's value will not be changed.
 
@@ -155,7 +156,8 @@ can be long so it is worth looking at it in detail.
                              bool chainable,
                              std::string description,
                              std::string help_string,
-                             std::function<int(std::vector<std::string> args action_callback)>
+                             std::function<int(const std::vector<std::string>& args)> action_callback,
+                             std::function<bool(const std::vector<std::string>& args)> arguments_callback = nullptr)
 
 **action_name:** The name of the action. This name will always be used to refer to the action during the life of your
 application.
@@ -174,7 +176,7 @@ been parsed from the commandline and invoked by running the HorseWhisperer::Star
 callback is expected to return an int (like a main function would) and will be passed a `std::vector<std::string>` parameter
 which will contain the arguments passed to the action.
 
-    // action callback
+    // gallop action callback
     int gallop(std::vector<std::string> arguments) {
         for (int i = 0; i < GetFlag<int>("ponies"); i++) {
             std::cout << "Galloping into the night!" << std::endl;
@@ -182,10 +184,31 @@ which will contain the arguments passed to the action.
         return 0;
     }
 
-    ...
+**arguments_callback (optional):** This optional callback will be executed when we invoke the
+HorseWhisperer::ValidateActionArguments() function. Here you can process the arguments of a given
+action and validate them. The arguments are passed as a vector of strings, as for the above
+action_callback. This callback must return a boolean value, that should indicate the outcome of the
+arguments validation.
 
-    HorseWhisperer::DefineAction("gallop", 0, false, "make the ponies gallop",
+    // trot arguments callback
+    bool trotArgumentsCallback(const std::vector<std::string>& arguments) {
+        for (std::string arg : arguments) {
+            if (arg.find("mode", 0) == std::string::npos) {
+                std::cout << "Error: invalid trot argument " << arg << ".\n";
+                return false;
+            }
+        }
+        return true;
+    }
+
+
+Here's how we define actions:
+
+    HorseWhisperer::DefineAction("gallop", 0, true, "make the ponies gallop",
                                  "The horses, they be a galloping", gallop);
+    HorseWhisperer::DefineAction("trot", -2, true, "make the ponies trot in some way",
+                                 "The horses, they be trotting in some 'mode ...'",
+                                 trot, trotArgumentsCallback);
 
 This will change `--help` output to
 
@@ -199,16 +222,24 @@ This will change `--help` output to
     Actions:
 
       gallop                      make the ponies gallop
+      trot                        make the ponies trot in some way
 
-Action specific help is now available for gallop...
+Action specific help is now available...
 
     $ myprog gallop --help
     The horses, they be a galloping
 
-and the action can be called
+    $ myprog trot --help
+    The horses, they be trotting in some 'mode ...'
+
+and actions can be called
 
     $ myprog gallop
     Galloping into the night!
+
+    $ myprog trot 'mode bullet' 'mode rocket'
+    Trotting like a bullet
+    Trotting like a rocket
 
 ### Defining action specific flags
 
@@ -221,7 +252,7 @@ The function is very similar to `DefineGlobalFlag` but it is worth taking an in 
                           std::string aliases,
                           std::string description,
                           FlagType default_value,
-                          std::function<bool(FlagType)> validation_callback)
+                          std::function<bool(FlagType)> flag_callback)
 
 **action_name:** The name of the action to bind this flag to.
 
@@ -231,7 +262,7 @@ The function is very similar to `DefineGlobalFlag` but it is worth taking an in 
 
 **default_value:** Default value of the flag which is set.
 
-**validation_callback:** The validation callback will be called when the flag is set. This can be any function
+**flag_callback:** The validation callback will be called when the flag is set. This can be any function
 you provide and it doesn't necessarily have to be used for validation. Be aware that the function will be expected
 to return a boolean value. If false is returned the flag's value will not be changed.
 
@@ -279,7 +310,7 @@ But when set inside the context of `gallop`
     $ myprog gallop --tired
     The pony is too tired to gallop.
 
-### Parsing commandline arguments
+### Parsing commandline: global flags, actions, action flags, and action arguments
 
 When all flags and actions have been defined we are ready to parse the commandline and build
 a chain of contexts. The contexts contain the global flags, a list of actions and the order they should
@@ -287,6 +318,15 @@ be called in as well as the flags used only by them.
 
     // bool Parse(int argc, char** argv)
     Parse(argc, argv); // The same argv and argc passed to main()
+
+### Validating action arguments
+
+When the commandline is parsed, you can trigger the execution of the optional action argument callbacks
+by calling HorseWhisperer::ValidateActionArguments(). In case any of of the callbacks return false,
+this function stops executing and returns false. It returns true otherwise.
+
+    // bool ValidateActionArguments()
+    ValidateActionArguments();
 
 ### Executing actions
 

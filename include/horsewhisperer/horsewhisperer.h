@@ -19,39 +19,28 @@
 
 namespace HorseWhisperer {
 
+//
+// Tokens
+//
+
 static const std::string VERSION_STRING = "0.1.0";
+
+// Context indexes
 static const int GLOBAL_CONTEXT_IDX = 0;
 static const int NO_CONTEXT_IDX = -1;
 
-using ActionCallback = std::function<int(std::vector<std::string> args)>;
+//
+// Types
+//
 
 template <typename FlagType>
-using ValidationCallback = std::function<bool(FlagType)>;
+using FlagCallback = std::function<bool(FlagType)>;
 
+using Arguments = std::vector<std::string>;
 
-template <typename FlagType>
-static void DefineGlobalFlag(std::string aliases,
-                             std::string description,
-                             FlagType default_value,
-                             ValidationCallback<FlagType>validation_callback) __attribute__ ((unused));
-template <typename FlagType>
-static void DefineActionFlag(std::string action_name,
-                             std::string aliases,
-                             std::string description,
-                             FlagType default_value,
-                             ValidationCallback<FlagType> validation_callback) __attribute__ ((unused));
-template <typename FlagType>
-static FlagType GetFlag(std::string flag_name) __attribute__ ((unused));
-template <typename FlagType>
-static bool SetFlag(std::string flag_name, FlagType value) __attribute__ ((unused));
-static void DefineAction(std::string action_name, int arity, bool chainable, std::string description, std::string help_string,
-                           ActionCallback action_callback) __attribute__ ((unused));
-static void SetAppName(std::string name) __attribute__ ((unused));
-static void SetHelpBanner(std::string banner) __attribute__ ((unused));
-static void SetVersion(std::string version) __attribute__ ((unused));
-static void SetDelimiters(std::vector<std::string> delimiters) __attribute__ ((unused));
-static bool Parse(int argc, char** argv) __attribute__ ((unused));
-static int Start() __attribute__ ((unused));
+using ArgumentsCallback = std::function<bool(const Arguments& arguments)>;
+
+using ActionCallback = std::function<int(const Arguments& arguments)>;
 
 struct FlagBase {
     virtual ~FlagBase() {};
@@ -62,7 +51,7 @@ struct FlagBase {
 template <typename FlagType>
 struct Flag : FlagBase {
     FlagType value;
-    ValidationCallback<FlagType> validation_callback;
+    FlagCallback<FlagType> flag_callback;
 };
 
 struct Action {
@@ -77,6 +66,8 @@ struct Action {
     int arity; // Arity of the action
     // Function called when we invoke the action
     ActionCallback action_callback;
+    // Function called when we validate action arguments
+    ArgumentsCallback arguments_callback;
     // Context sensitive action help
     std::string help_string_;
     bool success;
@@ -86,11 +77,44 @@ struct Action {
 struct Context {
     std::map<std::string, FlagBase*> flags; // Flags defined for the given context
     Action* action; // What this context is doing
-    std::vector<std::string> arguments;
+    Arguments arguments; // Action arguments
 };
 
 typedef std::unique_ptr<Context> ContextPtr;
 
+//
+// Functions
+//
+
+template <typename FlagType>
+static void DefineGlobalFlag(std::string aliases,
+                             std::string description,
+                             FlagType default_value,
+                             FlagCallback<FlagType> flag_callback) __attribute__ ((unused));
+template <typename FlagType>
+static void DefineActionFlag(std::string action_name,
+                             std::string aliases,
+                             std::string description,
+                             FlagType default_value,
+                             FlagCallback<FlagType> flag_callback) __attribute__ ((unused));
+template <typename FlagType>
+static FlagType GetFlag(std::string flag_name) __attribute__ ((unused));
+template <typename FlagType>
+static bool SetFlag(std::string flag_name, FlagType value) __attribute__ ((unused));
+static void DefineAction(std::string action_name,
+                         int arity,
+                         bool chainable,
+                         std::string description,
+                         std::string help_string,
+                         ActionCallback action_callback,
+                         ArgumentsCallback arguments_callback) __attribute__ ((unused));
+static void SetAppName(std::string name) __attribute__ ((unused));
+static void SetHelpBanner(std::string banner) __attribute__ ((unused));
+static void SetVersion(std::string version) __attribute__ ((unused));
+static void SetDelimiters(std::vector<std::string> delimiters) __attribute__ ((unused));
+static bool Parse(int argc, char** argv) __attribute__ ((unused));
+static bool ValidateActionArguments() __attribute__ ((unused));
+static int Start() __attribute__ ((unused));
 
 // Because regex is busted on a lot of versions of libstdc++ I'm rolling
 // my own integer validation.
@@ -102,6 +126,10 @@ static bool validateInteger(std::string val) {
     }
     return true;
 }
+
+//
+// HorseWhisperer
+//
 
 class HorseWhisperer {
   public:
@@ -165,13 +193,14 @@ class HorseWhisperer {
                     ContextPtr action_context {new Context()};
                     action_context->flags = actions[argv[arg_idx]]->flags;
                     action_context->action = actions[argv[arg_idx]];
+                    action_context->arguments = Arguments {};
                     context_mgr.push_back(std::move(action_context));
                     current_context_idx++;
 
                     assert(current_context_idx == context_mgr.size() - 1);
 
+                    // parse arguments and action flags
                     int arity = context_mgr[current_context_idx]->action->arity;
-                    // parse parameters
                     if (arity > 0) { // iff read parameters = arity
                         for (; arity > 0; arity--) {
                             ++arg_idx;
@@ -196,7 +225,7 @@ class HorseWhisperer {
                                           << ". Found delimiter: " << argv[arg_idx] << std::endl;
                                 return false;
                             } else {
-                                 context_mgr[current_context_idx]->arguments.push_back(argv[arg_idx]);
+                                context_mgr[current_context_idx]->arguments.push_back(argv[arg_idx]);
                             }
                         }
                         if (arity > 0) {
@@ -239,7 +268,7 @@ class HorseWhisperer {
                                       << " parameters for action " << action << ". Only read "
                                       << expected_arity - abs_arity
                                       << "." << std::endl;
-                                      return false;
+                            return false;
                         }
                     }
                 } else {
@@ -250,6 +279,22 @@ class HorseWhisperer {
         }
 
         parsed_ = true;
+        return true;
+    }
+
+    bool validateActionArguments() {
+        if (context_mgr.size() > 1) {
+            for (auto & context : context_mgr) {
+                if (context->action) {
+                    if (context->action->arguments_callback) {
+                        if (!context->action->arguments_callback(context->arguments)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
         return true;
     }
 
@@ -298,12 +343,12 @@ class HorseWhisperer {
 
     template <typename FlagType>
     void defineGlobalFlag(std::string aliases, std::string description,
-                           FlagType default_value, ValidationCallback<FlagType> validation_callback){
+                           FlagType default_value, FlagCallback<FlagType> flag_callback){
         Flag<FlagType>* flagp = new Flag<FlagType>();
         flagp->aliases = aliases;
         flagp->value = default_value;
         flagp->description = description;
-        flagp->validation_callback = validation_callback;
+        flagp->flag_callback = flag_callback;
         // Aliases are space separated
         std::istringstream iss(aliases);
         while (iss) {
@@ -320,12 +365,12 @@ class HorseWhisperer {
 
     template <typename FlagType>
     void defineActionFlag(std::string action_name, std::string aliases, std::string description,
-                           FlagType default_value, ValidationCallback<FlagType> validation_callback){
+                           FlagType default_value, FlagCallback<FlagType> flag_callback){
         Flag<FlagType>* flagp = new Flag<FlagType>();
         flagp->aliases = aliases;
         flagp->value = default_value;
         flagp->description = description;
-        flagp->validation_callback = validation_callback;
+        flagp->flag_callback = flag_callback;
         // Aliases are space separated
         std::istringstream iss(aliases);
         std::string tmp;
@@ -336,14 +381,14 @@ class HorseWhisperer {
     }
 
     void defineAction(std::string name, int arity, bool chainable, std::string description, std::string help_string,
-                      ActionCallback action_callback) {
-
+                      ActionCallback action_callback, ArgumentsCallback arguments_callback) {
         Action* actionp = new Action();
         actionp->name = name;
         actionp->arity = arity;
         actionp->description = description;
         actionp->help_string_ = help_string;
         actionp->action_callback = action_callback;
+        actionp->arguments_callback = arguments_callback;
         actionp->chainable = chainable;
         actions[name] = actionp;
     }
@@ -368,7 +413,7 @@ class HorseWhisperer {
             flagp->value = value;
 
             // If there is a validation callback, do it
-            if (flagp->validation_callback && !flagp->validation_callback(value)) {
+            if (flagp->flag_callback && !flagp->flag_callback(value)) {
                 flagp->value = tmp_value;
                 return false;
             }
@@ -444,7 +489,7 @@ class HorseWhisperer {
             }
         } else if (dynamic_cast<Flag<int>*>(flagp)) {
             if (argv[++i]) {
-                    // Validate string looks like an interger
+                // Validate string looks like an interger
                 if (validateInteger(argv[i])) {
                     return setFlag<int>(flagname, std::stol(argv[i], nullptr, 10));
                 } else {
@@ -565,16 +610,19 @@ class HorseWhisperer {
     }
 };
 
+//
+// API
+//
 
 template <typename FlagType>
 static void DefineGlobalFlag(std::string aliases,
                                 std::string description,
                                 FlagType default_value,
-                                ValidationCallback<FlagType> validation_callback) {
+                                FlagCallback<FlagType> flag_callback) {
     HorseWhisperer::Instance().defineGlobalFlag<FlagType>(aliases,
                                                          description,
                                                          default_value,
-                                                         validation_callback);
+                                                         flag_callback);
 }
 
 template <typename FlagType>
@@ -582,12 +630,12 @@ static void DefineActionFlag(std::string action_name,
                                 std::string aliases,
                                 std::string description,
                                 FlagType default_value,
-                                ValidationCallback<FlagType> validation_callback) {
+                                FlagCallback<FlagType> flag_callback) {
     HorseWhisperer::Instance().defineActionFlag<FlagType>(action_name,
-                                                         aliases,
-                                                         description,
-                                                         default_value,
-                                                         validation_callback);
+                                                          aliases,
+                                                          description,
+                                                          default_value,
+                                                          flag_callback);
 }
 
 template <typename FlagType>
@@ -600,11 +648,22 @@ static bool SetFlag(std::string flag_name, FlagType value) {
     return HorseWhisperer::Instance().setFlag<FlagType>(flag_name, value);
 }
 
-static void DefineAction(std::string action_name, int arity, bool chainable, std::string description,
-                           std::string help_string, ActionCallback action_callback) {
-    HorseWhisperer::Instance().defineAction(action_name, arity, chainable, description, help_string, action_callback);
-
+static void DefineAction(std::string action_name,
+                           int arity,
+                           bool chainable,
+                           std::string description,
+                           std::string help_string,
+                           ActionCallback action_callback,
+                           ArgumentsCallback arguments_callback = nullptr) {
+    HorseWhisperer::Instance().defineAction(action_name,
+                                            arity,
+                                            chainable,
+                                            description,
+                                            help_string,
+                                            action_callback,
+                                            arguments_callback);
 }
+
 static void SetAppName(std::string name) {
     HorseWhisperer::Instance().setAppName(name);
 }
@@ -623,6 +682,10 @@ static void SetDelimiters(std::vector<std::string> delimiters) {
 
 static bool Parse(int argc, char** argv) {
     return HorseWhisperer::Instance().parse(argc, argv);
+}
+
+static bool ValidateActionArguments() {
+    return HorseWhisperer::Instance().validateActionArguments();
 }
 
 static int Start() {
