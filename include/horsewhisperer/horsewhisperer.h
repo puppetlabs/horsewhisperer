@@ -23,7 +23,7 @@ namespace HorseWhisperer {
 // Tokens
 //
 
-static const std::string VERSION_STRING = "0.1.0";
+static const std::string VERSION_STRING = "0.2.0";
 
 // Context indexes
 static const int GLOBAL_CONTEXT_IDX = 0;
