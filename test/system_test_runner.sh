@@ -25,7 +25,7 @@ check_strings() {
   fi
 }
 
-check_num_lines() {
+check_numeric_pair() {
   if [ $1 -ne $2 ]; then
     exit $EXIT_FAILURE
   fi
@@ -45,7 +45,7 @@ check_strings "$ACTION_MSG" 'Galloping'
 
 # global flag: we expect the above message 4 times
 MSG_NUM=`"$EXAMPLE" gallop --ponies 4 | awk '{ if ( $1 ~ /Galloping/ ) {print $1} }' | wc -l`
-check_num_lines $MSG_NUM 4
+check_numeric_pair $MSG_NUM 4
 
 # action flag: we expect a different message from the action callback
 TIRED_MSG=`"$EXAMPLE" gallop --tired`
@@ -63,7 +63,7 @@ Failed to parse the command line input.'''
 
 # action arguments: we expect it works with at least 2 correct arguments
 TROT_MSG_NUM=`"$EXAMPLE" trot 'mode world champion' 'mode panda' 'mode rhino' | grep Trotting | wc -l`
-check_num_lines $TROT_MSG_NUM 3
+check_numeric_pair $TROT_MSG_NUM 3
 
 # invalid action arguments: we expect a validation error
 INVALID_ARG_ERROR=`"$EXAMPLE" trot 'mode world champion' panda`
@@ -77,5 +77,29 @@ Failed to validate the action arguments.'''
 
 # chaining works
 CHAINING_MSG=`"$EXAMPLE" gallop + trot 'mode one' 'mode two' 'mode three' --ponies 4`
-check_num_lines `echo "$CHAINING_MSG" | grep Galloping | wc -l` 4
-check_num_lines `echo "$CHAINING_MSG" | grep Trotting | wc -l` 3
+check_numeric_pair `echo "$CHAINING_MSG" | grep Galloping | wc -l` 4
+check_numeric_pair `echo "$CHAINING_MSG" | grep Trotting | wc -l` 3
+
+# return code: valid request
+"$EXAMPLE" gallop > /dev/null 2>&1
+check_numeric_pair $? 0
+
+# return code: fails to parse
+"$EXAMPLE" gallop "invalid_argument" > /dev/null 2>&1
+check_numeric_pair $? 1
+
+# return code: invalid flag type
+"$EXAMPLE" gallop --ponies "forty two" > /dev/null 2>&1
+check_numeric_pair $? 2
+
+# return code: help request
+"$EXAMPLE" --help > /dev/null 2>&1
+check_numeric_pair $? 0
+
+# return code: action help request
+"$EXAMPLE" trot --help > /dev/null 2>&1
+check_numeric_pair $? 0
+
+# return code: version request
+"$EXAMPLE" --version > /dev/null 2>&1
+check_numeric_pair $? 0

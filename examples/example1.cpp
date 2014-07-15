@@ -101,9 +101,21 @@ int main(int argc, char* argv[]) {
                  trot, trotArgumentsCallback);
 
     // Parse command line: global flags, action arguments, and action flags
-    if (!Parse(argc, argv)) {
-        std::cout << "Failed to parse the command line input.\n";
-        return 1;
+    switch (Parse(argc, argv)) {
+        case PARSE_OK:
+            break;
+        case PARSE_HELP:
+            ShowHelp();
+            return 0;
+        case PARSE_VERSION:
+            ShowVersion();
+            return 0;
+        case PARSE_ERROR:
+            std::cout << "Failed to parse the command line input.\n";
+            return 1;
+        case PARSE_INVALID_FLAG:
+            std::cout << "Invalid flag.\n";
+            return 2;
     }
 
     // Process and validate action arguments
