@@ -2,6 +2,17 @@
 
 Change history for HorseWhisperer.
 
+# 0.3.0
+
+Released 2014-07-15
+
+* Improvements and update to example program and testing
+* The Parse function now returns an integer indicating its outcome
+* New function to display the help message
+* New function to display the version string
+* ValidateActionArguments now checks if Parse succeeded
+* The Start function now checks if Parse succeeded
+
 # 0.2.0
 
 Released 2014-07-09

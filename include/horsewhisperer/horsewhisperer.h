@@ -23,11 +23,18 @@ namespace HorseWhisperer {
 // Tokens
 //
 
-static const std::string VERSION_STRING = "0.2.0";
+static const std::string VERSION_STRING = "0.3.0";
 
 // Context indexes
 static const int GLOBAL_CONTEXT_IDX = 0;
 static const int NO_CONTEXT_IDX = -1;
+
+// Parse results
+static const int PARSE_OK = 0;
+static const int PARSE_HELP = -1;
+static const int PARSE_VERSION = -2;
+static const int PARSE_ERROR = 1;
+static const int PARSE_INVALID_FLAG = 2;
 
 //
 // Types
@@ -112,8 +119,10 @@ static void SetAppName(std::string name) __attribute__ ((unused));
 static void SetHelpBanner(std::string banner) __attribute__ ((unused));
 static void SetVersion(std::string version) __attribute__ ((unused));
 static void SetDelimiters(std::vector<std::string> delimiters) __attribute__ ((unused));
-static bool Parse(int argc, char** argv) __attribute__ ((unused));
+static int Parse(int argc, char** argv) __attribute__ ((unused));
 static bool ValidateActionArguments() __attribute__ ((unused));
+static void ShowHelp() __attribute__ ((unused));
+static void ShowVersion() __attribute__ ((unused));
 static int Start() __attribute__ ((unused));
 
 // Because regex is busted on a lot of versions of libstdc++ I'm rolling
@@ -175,15 +184,13 @@ class HorseWhisperer {
         return false;
     }
 
-    bool parse(int argc, char* argv[]) {
+    int parse(int argc, char* argv[]) {
         for (int arg_idx = 1; arg_idx < argc; arg_idx++) {
             // Identify if it's a flag
             if (argv[arg_idx][0] == '-') {
-                if (!parseFlag(argv, arg_idx)) {
-                    return false;
-                }
-                if (abort_parse_) {
-                    return true;
+                int parse_flag_outcome { parseFlag(argv, arg_idx ) };
+                if (parse_flag_outcome != PARSE_OK) {
+                    return parse_flag_outcome;
                 }
             } else if (isDelimiter(argv[arg_idx])) { // skip over delimiter
                 continue;
@@ -207,23 +214,19 @@ class HorseWhisperer {
                             if (argv[arg_idx] == nullptr) { // have we run out of tokens?
                                 break;
                             } else if (argv[arg_idx][0] == '-') { // is it a flag token?
-                                if (!parseFlag(argv, arg_idx)) {
-                                    return false;
-                                }
-                                if (abort_parse_) {
-                                    // When a special event like a --version or --help flag
-                                    // are found, we terminate the parse process.
-                                    return true;
+                                int parse_flag_outcome { parseFlag(argv, arg_idx ) };
+                                if (parse_flag_outcome != PARSE_OK) {
+                                    return parse_flag_outcome;
                                 }
                             } else if (isActionDefined(argv[arg_idx])) { // is it an action?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found action: " << argv[arg_idx] << std::endl;
-                                return false;
+                                return PARSE_ERROR;
                             } else if (std::find(delimiters_.begin(), delimiters_.end(),
                                                  argv[arg_idx]) != delimiters_.end()) { // is it a delimiter?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found delimiter: " << argv[arg_idx] << std::endl;
-                                return false;
+                                return PARSE_ERROR;
                             } else {
                                 context_mgr[current_context_idx]->arguments.push_back(argv[arg_idx]);
                             }
@@ -233,7 +236,7 @@ class HorseWhisperer {
                                       << " parameters for action " << action << ". Only read "
                                       << context_mgr[current_context_idx]->action->arity - arity
                                       << "." << std::endl;
-                            return false;
+                            return PARSE_ERROR;
                         }
                     } else if (arity < 0) { // if read parameters at least = arity
                         // When arity is an "at least" representation we eat arguments
@@ -241,7 +244,7 @@ class HorseWhisperer {
 
                         if (arg_idx >= argc - 1) {
                             std::cout << "No arguments specified for " << action << ".\n";
-                            return false;
+                            return PARSE_ERROR;
                         }
 
                         int abs_arity { -arity };
@@ -249,11 +252,9 @@ class HorseWhisperer {
                         do {
                             ++arg_idx;
                             if (argv[arg_idx][0] == '-') {
-                                if (!parseFlag(argv, arg_idx)) {
-                                    return false;
-                                }
-                                if (abort_parse_) {
-                                    return true;
+                                int parse_flag_outcome { parseFlag(argv, arg_idx ) };
+                                if (parse_flag_outcome != PARSE_OK) {
+                                    return parse_flag_outcome;
                                 }
                             }else {
                                 context_mgr[current_context_idx]->arguments.push_back(argv[arg_idx]);
@@ -268,28 +269,30 @@ class HorseWhisperer {
                                       << " parameters for action " << action << ". Only read "
                                       << expected_arity - abs_arity
                                       << "." << std::endl;
-                            return false;
+                            return PARSE_ERROR;
                         }
                     }
                 } else {
                     std::cout << "Unknown action: " << argv[arg_idx] << std::endl;
-                    return false;
+                    return PARSE_ERROR;
                 }
             }
         }
 
         parsed_ = true;
-        return true;
+        return PARSE_OK;
     }
 
     bool validateActionArguments() {
+        if (!parsed_) {
+            return false;
+        }
+
         if (context_mgr.size() > 1) {
             for (auto & context : context_mgr) {
-                if (context->action) {
-                    if (context->action->arguments_callback) {
-                        if (!context->action->arguments_callback(context->arguments)) {
-                            return false;
-                        }
+                if (context->action && context->action->arguments_callback) {
+                    if (!context->action->arguments_callback(context->arguments)) {
+                        return false;
                     }
                 }
             }
@@ -301,7 +304,6 @@ class HorseWhisperer {
     // Dynamically output help information based on registered global and action
     // specific flags
     void help() {
-        abort_parse_ = true;
         if (context_mgr[current_context_idx]->action) {
             actionHelp();
         } else {
@@ -309,9 +311,14 @@ class HorseWhisperer {
         }
     }
 
+    // Display the version information on stdout
+    void version() {
+        std::cout << version_string_;
+    }
+
     bool whisper() {
-        if (abort_parse_) {
-            return true;
+        if (!parsed_) {
+            return false;
         }
 
         current_context_idx = GLOBAL_CONTEXT_IDX - 1;
@@ -405,7 +412,7 @@ class HorseWhisperer {
 
     // ALSO check both contexts
     template <typename FlagType>
-    bool setFlag(std::string name, FlagType value) {
+    int setFlag(std::string name, FlagType value) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
             Flag<FlagType>* flagp = static_cast<Flag<FlagType>*>(context_mgr[context_idx]->flags[name]);
@@ -415,13 +422,13 @@ class HorseWhisperer {
             // If there is a validation callback, do it
             if (flagp->flag_callback && !flagp->flag_callback(value)) {
                 flagp->value = tmp_value;
-                return false;
+                return PARSE_INVALID_FLAG;
             }
 
-            return true;
+            return PARSE_OK;
         }
 
-        return false;
+        return PARSE_ERROR;
     };
 
   private:
@@ -434,9 +441,8 @@ class HorseWhisperer {
     std::string application_name_ = "";
     std::string help_banner_ = "";
     std::string version_string_ = "";
-    bool abort_parse_ = false; // abort parse if condition is hit (version or help flag)
 
-    bool parseFlag(char* argv[], int& i) {
+    int parseFlag(char* argv[], int& i) {
         // It's a flag. Get the array offset
         int offset = 1;
         if (argv[i][1] == '-') {
@@ -451,27 +457,23 @@ class HorseWhisperer {
             if (vlevel == flagname.size()) {
                 setFlag<bool>("verbose", true);
                 setFlag<int>("vlevel", vlevel);
-                return true;
+                return PARSE_OK;
             }
         }
 
         // Deal with the special help flag
         if (flagname == "help" || flagname == "h") {
-            help();
-            return true;
+            return PARSE_HELP;
         }
 
         // Deal with the special --version flag
         if (flagname == "version") {
-            std::cout << version_string_;
-            abort_parse_ = true;
-            return true;
+            return PARSE_VERSION;
         }
 
         if (!isFlagDefined(flagname)) {
-            // TODO(ploubser): Should I warn context?
             std::cout << "Unknown flag: " << flagname << std::endl;
-            return false;
+            return PARSE_ERROR;
         }
 
         int context_idx = getContextIdxIfDefined(flagname);
@@ -485,7 +487,7 @@ class HorseWhisperer {
                 return setFlag<std::string>(flagname, std::string(argv[i]));
             } else {
                 std::cout << "Missing value for flag: " << argv[i-1] << std::endl;
-                return false;
+                return PARSE_ERROR;
             }
         } else if (dynamic_cast<Flag<int>*>(flagp)) {
             if (argv[++i]) {
@@ -494,16 +496,16 @@ class HorseWhisperer {
                     return setFlag<int>(flagname, std::stol(argv[i], nullptr, 10));
                 } else {
                     std::cout << "Flag '" << flagname << "' expects a value of type integer" << std::endl;
-                    return false;
+                    return PARSE_INVALID_FLAG;
                 }
             } else {
                 std::cout << "Missing value for flag: " << argv[i-1] << std::endl;
-                return false;
+                return PARSE_ERROR;
             }
         }
 
         std::cout << flagname << " is not of a valid flag type." << std::endl;
-        return false;
+        return PARSE_ERROR;
     }
 
     // Display help information for the global context
@@ -680,14 +682,24 @@ static void SetDelimiters(std::vector<std::string> delimiters) {
     HorseWhisperer::Instance().setDelimiters(delimiters);
 }
 
-static bool Parse(int argc, char** argv) {
+static int Parse(int argc, char** argv) {
     return HorseWhisperer::Instance().parse(argc, argv);
 }
 
+// Return false if parse didn't succeed.
 static bool ValidateActionArguments() {
     return HorseWhisperer::Instance().validateActionArguments();
 }
 
+static void ShowHelp() {
+    HorseWhisperer::Instance().help();
+}
+
+static void ShowVersion() {
+    HorseWhisperer::Instance().version();
+}
+
+// Return 1 if parse didn't succeed.
 static int Start() {
     return HorseWhisperer::Instance().whisper();
 }

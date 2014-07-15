@@ -313,17 +313,33 @@ But when set inside the context of `gallop`
 ### Parsing commandline: global flags, actions, action flags, and action arguments
 
 When all flags and actions have been defined we are ready to parse the commandline and build
-a chain of contexts. The contexts contain the global flags, a list of actions and the order they should
-be called in as well as the flags used only by them.
+a chain of contexts. The contexts contain the global flags, a list of actions and the order
+they should be called in as well as the flags used only by them.
 
-    // bool Parse(int argc, char** argv)
+    // int Parse(int argc, char** argv)
     Parse(argc, argv); // The same argv and argc passed to main()
+
+The HorseWhisperer::Parse function will return an integer indicating the operation outcome.
+The possible return values are listed below, together with the related macro.
+
+    PARSE_OK = 0;             // success
+    PARSE_HELP = -1;          // help request
+    PARSE_VERSION = -2;       // version request
+    PARSE_ERROR = 1;          // failed to parse (e.g. missing argument)
+    PARSE_INVALID_FLAG = 2;   // invalid flag (e.g. string instead of an integer)
+
+### Displaying the help message
+
+If the HorseWhisperer::Parse function returns a PARSE_HELP value, you can simply call
+HorseWhisperer::ShowHelp to display the requested help message (global or action-specific).
 
 ### Validating action arguments
 
 When the commandline is parsed, you can trigger the execution of the optional action argument callbacks
 by calling HorseWhisperer::ValidateActionArguments(). In case any of of the callbacks return false,
 this function stops executing and returns false. It returns true otherwise.
+Also note that the validate function will always return false if HorseWhisperer::Parse did not
+return PARSE_OK previously.
 
     // bool ValidateActionArguments()
     ValidateActionArguments();
@@ -331,6 +347,8 @@ this function stops executing and returns false. It returns true otherwise.
 ### Executing actions
 
 When the commandline has been parsed starting your chain of action is as simple as calling the Start() function. Actions will continue to be executed until either the end of the list is reached or an action fails. When finished it will return the result of all the executed actions and'ed together (a return value of 0 means everything succeeded, 1 means the last attempt at executing an action failed).
+In case a previous HorseWhisperer::Parse call did not return PARSE_OK, the start function will
+immediately return 1, without executing any action callback.
 
     // int Start();
     return Start();
