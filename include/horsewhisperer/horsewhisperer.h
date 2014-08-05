@@ -104,6 +104,7 @@ static void DefineActionFlag(std::string action_name,
                              std::string description,
                              FlagType default_value,
                              FlagCallback<FlagType> flag_callback) __attribute__ ((unused));
+static bool IsActionFlag(std::string action, std::string flagname) __attribute__ ((unused));
 template <typename FlagType>
 static FlagType GetFlag(std::string flag_name) __attribute__ ((unused));
 template <typename FlagType>
@@ -184,6 +185,16 @@ class HorseWhisperer {
         return false;
     }
 
+    bool isActionFlag(std::string action, std::string flagname) {
+        for (const auto& flag : actions[action]->flags) {
+            if (flagname.compare(flag.first) == 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     int parse(int argc, char* argv[]) {
         for (int arg_idx = 1; arg_idx < argc; arg_idx++) {
             // Identify if it's a flag
@@ -260,7 +271,7 @@ class HorseWhisperer {
                                 context_mgr[current_context_idx]->arguments.push_back(argv[arg_idx]);
                                 --abs_arity;
                             }
-                        } while (argv[arg_idx+1] && std::find(delimiters_.begin(), delimiters_.end(),
+                        } while ((arg_idx+1 < argc) && std::find(delimiters_.begin(), delimiters_.end(),
                                                               argv[arg_idx+1]) == delimiters_.end());
 
                         if (abs_arity > 0) {
@@ -325,17 +336,21 @@ class HorseWhisperer {
         bool previous_result = true;
 
         if (context_mgr.size() > 1) {
-            for (auto & context : context_mgr) {
-
+            for (size_t i = 0; i < context_mgr.size(); i++) {
                 current_context_idx++;
-                if (context->action) {
+                if (context_mgr[i]->action) {
                     if (!previous_result) {
-                        std::cout << "Not starting action '" << context->action->name
+                        std::cout << "Not starting action '" << context_mgr[i]->action->name
                                   << "'. Previous action failed to complete successfully." << std::endl;
                     } else {
+                        // Record the current_context_idx. calling parse inside an action_callback
+                        // allows the context list to grow during execution but has the side effect of
+                        // mutating the current_context_index.
+                        int tmp = current_context_idx;
                         // Flip it because success is 0
-                        previous_result = !context->action->action_callback(context->arguments);
-                        if (!context->action->chainable) {
+                        previous_result = !context_mgr[i]->action->action_callback(context_mgr[i]->arguments);
+                        current_context_idx = tmp;
+                        if (!context_mgr[i]->action->chainable) {
                             return !previous_result;
                         }
                     }
@@ -664,6 +679,10 @@ static void DefineAction(std::string action_name,
                                             help_string,
                                             action_callback,
                                             arguments_callback);
+}
+
+static bool IsActionFlag(std::string action, std::string flagname) {
+    return HorseWhisperer::Instance().isActionFlag(action, flagname);
 }
 
 static void SetAppName(std::string name) {
