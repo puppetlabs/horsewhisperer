@@ -70,6 +70,10 @@ At any point after declaring a flag it's value can be set or looked up by the fo
     template <typename FlagType>
     bool SetFlag(std::string flag_name, FlagType value)
 
+The vlevel value can be accessed with by calling GetFlag
+
+    GetFlag<int>("vlevel")
+
 ### Configuring the global context
 
 The banner message displayed by the `--help` flag can be set with the `SetHelpBanner` function.
