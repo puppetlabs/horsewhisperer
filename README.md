@@ -70,7 +70,7 @@ At any point after declaring a flag it's value can be set or looked up by the fo
     template <typename FlagType>
     bool SetFlag(std::string flag_name, FlagType value)
 
-The vlevel value can be accessed with by calling GetFlag
+The vlevel value can be accessed by calling GetFlag:
 
     GetFlag<int>("vlevel")
 
