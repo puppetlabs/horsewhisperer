@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 // To disable assert()
 #define NDEBUG
 #include <cassert>
@@ -20,10 +21,31 @@
 namespace HorseWhisperer {
 
 //
+// Exceptions
+//
+
+class horsewhisperer_error : public std::runtime_error {
+  public:
+    explicit horsewhisperer_error(std::string const& msg) :
+            std::runtime_error(msg) {}
+};
+
+class undefined_flag_error : public horsewhisperer_error {
+  public:
+    explicit undefined_flag_error(std::string const& msg) :
+            horsewhisperer_error(msg) {}
+};
+
+class flag_validation_error : public horsewhisperer_error {
+  public:
+    explicit flag_validation_error(std::string const& msg) :
+            horsewhisperer_error(msg) {}
+};
+//
 // Tokens
 //
 
-static const std::string VERSION_STRING = "0.4.0";
+static const std::string VERSION_STRING = "0.5.0";
 
 // Context indexes
 static const int GLOBAL_CONTEXT_IDX = 0;
@@ -108,7 +130,7 @@ static bool IsActionFlag(std::string action, std::string flagname) __attribute__
 template <typename FlagType>
 static FlagType GetFlag(std::string flag_name) __attribute__ ((unused));
 template <typename FlagType>
-static bool SetFlag(std::string flag_name, FlagType value) __attribute__ ((unused));
+static void SetFlag(std::string flag_name, FlagType value) __attribute__ ((unused));
 static void DefineAction(std::string action_name,
                          int arity,
                          bool chainable,
@@ -125,6 +147,7 @@ static bool ValidateActionArguments() __attribute__ ((unused));
 static void ShowHelp() __attribute__ ((unused));
 static void ShowVersion() __attribute__ ((unused));
 static int Start() __attribute__ ((unused));
+static void Reset() __attribute__ ((unused));
 
 // Because regex is busted on a lot of versions of libstdc++ I'm rolling
 // my own integer validation.
@@ -193,6 +216,14 @@ class HorseWhisperer {
         }
 
         return false;
+    }
+
+    void reset() {
+        context_mgr.clear();
+        ContextPtr global_context { new Context() };
+        global_context->action = nullptr;
+        context_mgr.push_back(std::move(global_context));
+        current_context_idx = GLOBAL_CONTEXT_IDX;
     }
 
     int parse(int argc, char* argv[]) {
@@ -416,18 +447,19 @@ class HorseWhisperer {
     }
 
     template <typename FlagType>
-    FlagType getFlagValue(std::string name) {
+    FlagType getFlagValue(std::string name) throw (undefined_flag_error) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
             return static_cast<Flag<FlagType>*>(context_mgr[context_idx]->flags[name])->value;
         }
 
-        return FlagType();
+        throw undefined_flag_error { "undefined flag: " + name };
     };
 
     // ALSO check both contexts
     template <typename FlagType>
-    int setFlag(std::string name, FlagType value) {
+    void setFlag(std::string name, FlagType value) throw (undefined_flag_error,
+                                                          flag_validation_error) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
             Flag<FlagType>* flagp = static_cast<Flag<FlagType>*>(context_mgr[context_idx]->flags[name]);
@@ -437,13 +469,13 @@ class HorseWhisperer {
             // If there is a validation callback, do it
             if (flagp->flag_callback && !flagp->flag_callback(value)) {
                 flagp->value = tmp_value;
-                return PARSE_INVALID_FLAG;
+                throw flag_validation_error { "callback for flag '" + name +
+                                              "' returned false" };
             }
-
-            return PARSE_OK;
+            return;
         }
 
-        return PARSE_ERROR;
+        throw undefined_flag_error { "undefined flag: " + name };
     };
 
   private:
@@ -496,10 +528,12 @@ class HorseWhisperer {
 
         // RTTI to determine how set the flag value
         if (dynamic_cast<Flag<bool>*>(flagp)) {
-            return setFlag<bool>(flagname, true);
+            setFlag<bool>(flagname, true);
+            return PARSE_OK;
         } else if (dynamic_cast<Flag<std::string>*>(flagp)) {
             if (argv[++i]) {
-                return setFlag<std::string>(flagname, std::string(argv[i]));
+                setFlag<std::string>(flagname, std::string(argv[i]));
+                return PARSE_OK;
             } else {
                 std::cout << "Missing value for flag: " << argv[i-1] << std::endl;
                 return PARSE_ERROR;
@@ -508,7 +542,8 @@ class HorseWhisperer {
             if (argv[++i]) {
                 // Validate string looks like an interger
                 if (validateInteger(argv[i])) {
-                    return setFlag<int>(flagname, std::stol(argv[i], nullptr, 10));
+                    setFlag<int>(flagname, std::stol(argv[i], nullptr, 10));
+                    return PARSE_OK;
                 } else {
                     std::cout << "Flag '" << flagname << "' expects a value of type integer" << std::endl;
                     return PARSE_INVALID_FLAG;
@@ -661,8 +696,8 @@ static FlagType GetFlag(std::string flag_name) {
 }
 
 template <typename FlagType>
-static bool SetFlag(std::string flag_name, FlagType value) {
-    return HorseWhisperer::Instance().setFlag<FlagType>(flag_name, value);
+static void SetFlag(std::string flag_name, FlagType value) {
+    HorseWhisperer::Instance().setFlag<FlagType>(flag_name, value);
 }
 
 static void DefineAction(std::string action_name,
@@ -701,6 +736,7 @@ static void SetDelimiters(std::vector<std::string> delimiters) {
     HorseWhisperer::Instance().setDelimiters(delimiters);
 }
 
+// Return 1 if parse didn't succeed.
 static int Parse(int argc, char** argv) {
     return HorseWhisperer::Instance().parse(argc, argv);
 }
@@ -718,9 +754,12 @@ static void ShowVersion() {
     HorseWhisperer::Instance().version();
 }
 
-// Return 1 if parse didn't succeed.
 static int Start() {
     return HorseWhisperer::Instance().whisper();
+}
+
+static void Reset() {
+    HorseWhisperer::Instance().reset();
 }
 
 }  // namespace HorseWhisperer

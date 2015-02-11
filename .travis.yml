@@ -13,14 +13,24 @@ before_install:
   # and g++ 4.8
   - sudo apt-get -y install g++-4.8
   - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 50
+  # grab a pre-built cmake 2.8.12 from s3
+  - wget https://s3.amazonaws.com/kylo-pl-bucket/cmake_install.tar.bz2
+  - tar xjvf cmake_install.tar.bz2 --strip 1 -C $HOME
 
 script:
   - cd ./examples
   - "g++ -std=c++11 example1.cpp -o example"
+  - cd ../test
+  - mkdir release
+  - cd ./release
+  - $HOME/bin/cmake ..
+  - make
 
 after_script:
   - cd ../test
   - ./system_test_runner.sh
+  - cd ./release
+  - make test
 
 notifications:
   email: false
