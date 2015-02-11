@@ -70,6 +70,9 @@ At any point after declaring a flag it's value can be set or looked up by the fo
     template <typename FlagType>
     bool SetFlag(std::string flag_name, FlagType value)
 
+HorseWhisperer will throw a "horsewhisperer_error" exception when trying to apply GetFlag or
+SetFlag to an undefined flag.
+
 The vlevel value can be accessed by calling GetFlag:
 
     GetFlag<int>("vlevel")
