@@ -2,6 +2,14 @@
 
 Change history for HorseWhisperer.
 
+# 0.5.0
+
+Released 2015-02-11
+
+* Vendor catch testing framework
+* add unit tests
+* SetFlag and GetFlag now throw horsewhisperer_error if looking up defined flag
+
 # 0.4.0
 
 Released 2014-08-05
