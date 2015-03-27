@@ -28,5 +28,3 @@ TARGET_LINK_LIBRARIES(
 
 enable_testing()
 add_test(NAME "HorseWhisperer\\ tests" COMMAND ${test_BIN})
-
-
