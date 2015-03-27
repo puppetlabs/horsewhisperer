@@ -41,6 +41,7 @@ class flag_validation_error : public horsewhisperer_error {
     explicit flag_validation_error(std::string const& msg) :
             horsewhisperer_error(msg) {}
 };
+
 //
 // Tokens
 //
@@ -89,24 +90,33 @@ struct Action {
             delete flag.second;
         }
     }
+    // Action name
     std::string name;
-    std::map<std::string, FlagBase*> flags; // Keys local to the action
+    // Keys local to the action
+    std::map<std::string, FlagBase*> flags;
+    // Action description
     std::string description;
-    int arity; // Arity of the action
+    // Arity of the action
+    int arity;
     // Function called when we invoke the action
     ActionCallback action_callback;
     // Function called when we validate action arguments
     ArgumentsCallback arguments_callback;
     // Context sensitive action help
     std::string help_string_;
+    // Wheter the action succeded
     bool success;
+    // Whenter the action can be chained with other actions
     bool chainable;
 };
 
 struct Context {
-    std::map<std::string, FlagBase*> flags; // Flags defined for the given context
-    Action* action; // What this context is doing
-    Arguments arguments; // Action arguments
+    // Flags defined for the given context
+    std::map<std::string, FlagBase*> flags;
+    // What this context is doing
+    Action* action;
+    // Action arguments
+    Arguments arguments;
 };
 
 typedef std::unique_ptr<Context> ContextPtr;
@@ -251,9 +261,9 @@ class HorseWhisperer {
                     // parse arguments and action flags
                     int arity = context_mgr[current_context_idx]->action->arity;
                     if (arity > 0) { // iff read parameters = arity
-                        for (; arity > 0; arity--) {
+                        while (arity > 0) {
                             ++arg_idx;
-                            if (argv[arg_idx] == nullptr) { // have we run out of tokens?
+                            if (arg_idx >= argc) { // have we run out of tokens?
                                 break;
                             } else if (argv[arg_idx][0] == '-') { // is it a flag token?
                                 int parse_flag_outcome { parseFlag(argv, arg_idx ) };
@@ -271,8 +281,10 @@ class HorseWhisperer {
                                 return PARSE_ERROR;
                             } else {
                                 context_mgr[current_context_idx]->arguments.push_back(argv[arg_idx]);
+                                arity--;
                             }
                         }
+
                         if (arity > 0) {
                             std::cout << "Expected " << context_mgr[current_context_idx]->action->arity
                                       << " parameters for action " << action << ". Only read "

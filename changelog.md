@@ -2,6 +2,12 @@
 
 Change history for HorseWhisperer.
 
+# 0.5.1
+
+Released 2015-03-27
+
+* Fixed a bug where specifying a flag could let HW incorrectly process the arguments of an action
+
 # 0.5.0
 
 Released 2015-02-11
