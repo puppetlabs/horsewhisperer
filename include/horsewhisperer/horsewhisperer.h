@@ -490,6 +490,20 @@ class HorseWhisperer {
         throw undefined_flag_error { "undefined flag: " + name };
     };
 
+    std::vector<std::string> getParsedActions() {
+        std::vector<std::string> action_container {};
+
+        if (parsed_ && context_mgr.size() > 1) {
+            for (size_t i = 0; i < context_mgr.size(); i++) {
+                if (context_mgr[i]->action) {
+                    action_container.push_back(context_mgr[i]->action->name);
+                }
+            }
+        }
+
+        return action_container;
+    }
+
   private:
     int current_context_idx;
     std::vector<ContextPtr> context_mgr;
@@ -764,6 +778,10 @@ static void ShowHelp() {
 
 static void ShowVersion() {
     HorseWhisperer::Instance().version();
+}
+
+static std::vector<std::string> GetParsedActions() {
+    return HorseWhisperer::Instance().getParsedActions();
 }
 
 static int Start() {
