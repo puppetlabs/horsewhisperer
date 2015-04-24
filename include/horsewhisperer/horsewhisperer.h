@@ -149,6 +149,7 @@ static void DefineAction(std::string action_name,
                          ActionCallback action_callback,
                          ArgumentsCallback arguments_callback) __attribute__ ((unused));
 static void SetAppName(std::string name) __attribute__ ((unused));
+static std::vector<std::string> GetParsedActions() __attribute__ ((unused));
 static void SetHelpBanner(std::string banner) __attribute__ ((unused));
 static void SetVersion(std::string version) __attribute__ ((unused));
 static void SetDelimiters(std::vector<std::string> delimiters) __attribute__ ((unused));
