@@ -173,6 +173,30 @@ TEST_CASE("parse", "[parse]") {
     }
 }
 
+TEST_CASE("HorseWhisperer::getActions" "[getActions]") {
+    HW::Reset();
+    prepareGlobal();
+
+    HorseWhisperer::DefineAction("new_action_2", 0, false, "test-action", "no help",
+                                 [](std::vector<std::string>) -> int
+                                        { return 0; });
+
+    SECTION("returns a vector containing a single action name") {
+        const char* args[] = { "test-app", "new_action", "spam", "eggs" };
+        HW::Parse(4, const_cast<char**>(args));
+        REQUIRE(HW::GetParsedActions() == std::vector<std::string> { "new_action" });
+    }
+
+    SECTION("returns a vector containing a single action name") {
+        const char* args[] = { "test-app", "new_action", "spam", "eggs" "+",
+                               "new_action_2" };
+        std::vector<std::string> test_result { "new_action", "new_action_2" };
+        HW::Parse(6, const_cast<char**>(args));
+        REQUIRE(HW::GetParsedActions() == test_result);
+    }
+
+}
+
 TEST_CASE("HorseWhisperer::Start", "[start]") {
     HW::Reset();
     prepareGlobal();
