@@ -2,6 +2,11 @@
 
 Change history for HorseWhisperer.
 
+# 0.6.0
+
+* Added GetParsedActions function that will return a std::vector<std::string> of
+actions parsed from a CLI string.
+
 # 0.5.1
 
 Released 2015-03-27
