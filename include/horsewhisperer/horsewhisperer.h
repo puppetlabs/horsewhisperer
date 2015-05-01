@@ -59,6 +59,9 @@ static const int PARSE_VERSION = -2;
 static const int PARSE_ERROR = 1;
 static const int PARSE_INVALID_FLAG = 2;
 
+// Right margin for help descriptions
+static const int DESCRIPTION_MARGIN = 30;
+
 //
 // Types
 //
@@ -636,21 +639,33 @@ class HorseWhisperer {
 
     // Output the help information related to a single flag
     void writeFlagHelp(const FlagBase* flag) {
-        std::stringstream input(flag->aliases);
+        std::stringstream input { flag->aliases };
         std::stringstream output;
         std::string tmp;
+        size_t last_alias_size { 0 };
 
         while (input >> tmp) {
             if (tmp != "") {
-                output << std::endl;
-                output << std::setw(30) << std::left;
+                output << "\n";
+                output << std::setw(DESCRIPTION_MARGIN) << std::left;
 
-                if (tmp.size() == 1) {
+                last_alias_size = tmp.size();
+
+                if (last_alias_size == 1) {
                     output << "   -" + tmp;
-                } else if (tmp.size() > 1) {
+                } else if (last_alias_size > 1) {
                     output << "  --" + tmp;
                 }
             }
+        }
+
+        // New line condition: (2 or 3 spaces + dash prefix + alias
+        // size + 2 spaces to separate from description) > margin
+        if (last_alias_size + 6 > DESCRIPTION_MARGIN) {
+            output << "\n";
+            output << std::setw(DESCRIPTION_MARGIN) << std::left;
+            // Same length as above to fill the field in the same way
+            output << "    ";
         }
 
         output << flag->description;
@@ -661,8 +676,9 @@ class HorseWhisperer {
     void writeActionDescription(const Action* action) {
         std::stringstream example;
         example << "  " << action->name;
-        std::cout << std::setw(30) << std::left << example.str()
-                  << std::setw(30) << std::left << action->description << std::endl;
+        std::cout << std::setw(DESCRIPTION_MARGIN) << std::left << example.str()
+                  << std::setw(DESCRIPTION_MARGIN) << std::left
+                  << action->description << std::endl;
     }
 
     bool isFlagDefined(std::string name) {
