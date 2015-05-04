@@ -159,6 +159,7 @@ static int Parse(int argc, char** argv) __attribute__ ((unused));
 static bool ValidateActionArguments() __attribute__ ((unused));
 static void ShowHelp() __attribute__ ((unused));
 static void ShowVersion() __attribute__ ((unused));
+static std::vector<std::string> GetParsedActions() __attribute__ ((unused));
 static int Start() __attribute__ ((unused));
 static void Reset() __attribute__ ((unused));
 
