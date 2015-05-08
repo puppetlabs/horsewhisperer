@@ -45,6 +45,74 @@ TEST_CASE("global SetFlag", "[global setflag]") {
         REQUIRE(HW::GetFlag<bool>("global-get") == true);
     }
 
+    SECTION("it sets the value of an int option") {
+        HW::DefineGlobalFlag<int>("global-int", "test", 1, nullptr);
+        HW::SetFlag<int>("global-int", 42);
+        REQUIRE(HW::GetFlag<int>("global-int") == 42);
+    }
+
+    SECTION("it sets the value of a double option") {
+        HW::DefineGlobalFlag<double>("global-double", "test", 1.1, nullptr);
+        HW::SetFlag<double>("global-double", 3.14);
+        REQUIRE(HW::GetFlag<double>("global-double") == 3.14);
+    }
+
+    SECTION("it sets the value of a string option") {
+        HW::DefineGlobalFlag<std::string>("global-string", "test", "bar", nullptr);
+        HW::SetFlag<std::string>("global-string", "foo");
+        REQUIRE(HW::GetFlag<std::string>("global-string") == "foo");
+    }
+
+    SECTION("it throws when trying to set an undefined flag") {
+        REQUIRE_THROWS_AS(HW::SetFlag<bool>("not-global-get", false),
+                          HW::undefined_flag_error);
+    }
+
+    SECTION("it does not throws when flag validation succeeds") {
+        HorseWhisperer::DefineGlobalFlag<bool>("global-success",
+                                               "a test flag",
+                                               false,
+                                               [](bool) -> bool { return true; });
+        REQUIRE_NOTHROW(HW::SetFlag<bool>("global-success", false));
+    }
+
+    SECTION("it throws when flag validation fails") {
+        HorseWhisperer::DefineGlobalFlag<bool>("global-failure",
+                                               "a test flag",
+                                               false,
+                                               [](bool) -> bool { return false; });
+        REQUIRE_THROWS_AS(HW::SetFlag<bool>("global-failure", false),
+                         HW::flag_validation_error);
+    }
+}
+
+TEST_CASE("GetFlagType", "[type]") {
+    HW::Reset();
+    prepareGlobal();
+
+    SECTION("correctly gives Bool type for a flag") {
+        HW::SetFlag<bool>("global-get", true);
+        REQUIRE(HW::GetFlagType("global-get") == HW::FlagType::Bool);
+    }
+
+    SECTION("correctly gives Int type") {
+        HW::DefineGlobalFlag<int>("global-int", "test", 1, nullptr);
+        HW::SetFlag<int>("global-int", 42);
+        REQUIRE(HW::GetFlagType("global-int") == HW::FlagType::Int);
+    }
+
+    SECTION("correctly gives Double type") {
+        HW::DefineGlobalFlag<double>("global-double", "test", 1.1, nullptr);
+        HW::SetFlag<double>("global-double", 3.14);
+        REQUIRE(HW::GetFlagType("global-double") == HW::FlagType::Double);
+    }
+
+    SECTION("correctly gives string type") {
+        HW::DefineGlobalFlag<std::string>("global-string", "test", "bar", nullptr);
+        HW::SetFlag<std::string>("global-string", "foo");
+        REQUIRE(HW::GetFlagType("global-string") == HW::FlagType::String);
+    }
+
     SECTION("it throws when trying to set an undefined flag") {
         REQUIRE_THROWS_AS(HW::SetFlag<bool>("not-global-get", false),
                           HW::undefined_flag_error);

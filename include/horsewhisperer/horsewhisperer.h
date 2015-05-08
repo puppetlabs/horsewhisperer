@@ -59,12 +59,17 @@ static const int PARSE_VERSION = -2;
 static const int PARSE_ERROR = 1;
 static const int PARSE_INVALID_FLAG = 2;
 
+// Right margin for help descriptions
+static const int DESCRIPTION_MARGIN = 30;
+
 //
 // Types
 //
 
-template <typename FlagType>
-using FlagCallback = std::function<bool(FlagType)>;
+enum FlagType { Bool, Int, Double, String };
+
+template <typename Type>
+using FlagCallback = std::function<bool(Type)>;
 
 using Arguments = std::vector<std::string>;
 
@@ -78,10 +83,10 @@ struct FlagBase {
     std::string description;
 };
 
-template <typename FlagType>
+template <typename Type>
 struct Flag : FlagBase {
-    FlagType value;
-    FlagCallback<FlagType> flag_callback;
+    Type value;
+    FlagCallback<Type> flag_callback;
 };
 
 struct Action {
@@ -125,22 +130,24 @@ typedef std::unique_ptr<Context> ContextPtr;
 // Functions
 //
 
-template <typename FlagType>
+template <typename Type>
 static void DefineGlobalFlag(std::string aliases,
                              std::string description,
-                             FlagType default_value,
-                             FlagCallback<FlagType> flag_callback) __attribute__ ((unused));
-template <typename FlagType>
+                             Type default_value,
+                             FlagCallback<Type> flag_callback) __attribute__ ((unused));
+template <typename Type>
 static void DefineActionFlag(std::string action_name,
                              std::string aliases,
                              std::string description,
-                             FlagType default_value,
-                             FlagCallback<FlagType> flag_callback) __attribute__ ((unused));
+                             Type default_value,
+                             FlagCallback<Type> flag_callback) __attribute__ ((unused));
 static bool IsActionFlag(std::string action, std::string flagname) __attribute__ ((unused));
-template <typename FlagType>
-static FlagType GetFlag(std::string flag_name) __attribute__ ((unused));
-template <typename FlagType>
-static void SetFlag(std::string flag_name, FlagType value) __attribute__ ((unused));
+template <typename Type>
+static Type GetFlag(std::string flag_name) __attribute__ ((unused));
+// Throws undefined_flag_error in case the specified flag is unknown
+static FlagType GetFlagType(std::string flag_name) __attribute__ ((unused));
+template <typename Type>
+static void SetFlag(std::string flag_name, Type value) __attribute__ ((unused));
 static void DefineAction(std::string action_name,
                          int arity,
                          bool chainable,
@@ -156,16 +163,27 @@ static int Parse(int argc, char** argv) __attribute__ ((unused));
 static bool ValidateActionArguments() __attribute__ ((unused));
 static void ShowHelp() __attribute__ ((unused));
 static void ShowVersion() __attribute__ ((unused));
+static std::vector<std::string> GetParsedActions() __attribute__ ((unused));
 static int Start() __attribute__ ((unused));
 static void Reset() __attribute__ ((unused));
 
 // Because regex is busted on a lot of versions of libstdc++ I'm rolling
 // my own integer validation.
-static bool validateInteger(std::string val) {
+static bool validateInteger(const std::string& val) {
     for (size_t i = 0; i < val.size(); i++) {
         if ((val[i] < '0') || (val[i] > '9')) {
             return false;
         }
+    }
+    return true;
+}
+
+static bool validateDouble(const std::string& val) {
+    std::istringstream i_s { val };
+    double x {};
+    char c;
+    if (!(i_s >> x) || i_s.get(c)) {
+        return false;
     }
     return true;
 }
@@ -406,10 +424,10 @@ class HorseWhisperer {
         return !previous_result;
     }
 
-    template <typename FlagType>
+    template <typename Type>
     void defineGlobalFlag(std::string aliases, std::string description,
-                           FlagType default_value, FlagCallback<FlagType> flag_callback){
-        Flag<FlagType>* flagp = new Flag<FlagType>();
+                          Type default_value, FlagCallback<Type> flag_callback){
+        Flag<Type>* flagp = new Flag<Type>();
         flagp->aliases = aliases;
         flagp->value = default_value;
         flagp->description = description;
@@ -428,10 +446,10 @@ class HorseWhisperer {
         }
     }
 
-    template <typename FlagType>
+    template <typename Type>
     void defineActionFlag(std::string action_name, std::string aliases, std::string description,
-                           FlagType default_value, FlagCallback<FlagType> flag_callback){
-        Flag<FlagType>* flagp = new Flag<FlagType>();
+                          Type default_value, FlagCallback<Type> flag_callback){
+        Flag<Type>* flagp = new Flag<Type>();
         flagp->aliases = aliases;
         flagp->value = default_value;
         flagp->description = description;
@@ -458,24 +476,51 @@ class HorseWhisperer {
         actions[name] = actionp;
     }
 
-    template <typename FlagType>
-    FlagType getFlagValue(std::string name) throw (undefined_flag_error) {
+    template <typename Type>
+    Type getFlagValue(std::string name) throw (undefined_flag_error) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
-            return static_cast<Flag<FlagType>*>(context_mgr[context_idx]->flags[name])->value;
+            return static_cast<Flag<Type>*>(context_mgr[context_idx]->flags[name])->value;
         }
 
         throw undefined_flag_error { "undefined flag: " + name };
     };
 
+    FlagType getFlagType(std::string flag_name) {
+        int context_idx = getContextIdxIfDefined(flag_name);
+
+        if (context_idx == NO_CONTEXT_IDX) {
+            throw undefined_flag_error { "undefined flag: " + flag_name };
+        }
+
+        auto flagp = context_mgr[context_idx]->flags[flag_name];
+        FlagType flag_type { FlagType::Bool };
+
+        // RTTI to determine the flag value type
+        if (dynamic_cast<Flag<bool>*>(flagp)) {
+            flag_type = FlagType::Bool;
+        } else if (dynamic_cast<Flag<std::string>*>(flagp)) {
+            flag_type = FlagType::String;
+        } else if (dynamic_cast<Flag<int>*>(flagp)) {
+            flag_type = FlagType::Int;
+        } else if (dynamic_cast<Flag<double>*>(flagp)) {
+            flag_type = FlagType::Double;
+        } else {
+            // We only support the types in the FlagType enum...
+            assert(false);
+        }
+
+        return flag_type;
+    }
+
     // ALSO check both contexts
-    template <typename FlagType>
-    void setFlag(std::string name, FlagType value) throw (undefined_flag_error,
-                                                          flag_validation_error) {
+    template <typename Type>
+    void setFlag(std::string name, Type value) throw (undefined_flag_error,
+                                                      flag_validation_error) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
-            Flag<FlagType>* flagp = static_cast<Flag<FlagType>*>(context_mgr[context_idx]->flags[name]);
-            FlagType tmp_value = flagp->value;
+            Flag<Type>* flagp = static_cast<Flag<Type>*>(context_mgr[context_idx]->flags[name]);
+            Type tmp_value = flagp->value;
             flagp->value = value;
 
             // If there is a validation callback, do it
@@ -549,35 +594,47 @@ class HorseWhisperer {
             return PARSE_ERROR;
         }
 
-        int context_idx = getContextIdxIfDefined(flagname);
-        FlagBase* flagp = context_mgr[context_idx]->flags[flagname];
-
-        // RTTI to determine how set the flag value
-        if (dynamic_cast<Flag<bool>*>(flagp)) {
-            setFlag<bool>(flagname, true);
-            return PARSE_OK;
-        } else if (dynamic_cast<Flag<std::string>*>(flagp)) {
-            if (argv[++i]) {
-                setFlag<std::string>(flagname, std::string(argv[i]));
+        switch (getFlagType(flagname)) {
+            case FlagType::Bool:
+                setFlag<bool>(flagname, true);
                 return PARSE_OK;
-            } else {
-                std::cout << "Missing value for flag: " << argv[i-1] << std::endl;
-                return PARSE_ERROR;
-            }
-        } else if (dynamic_cast<Flag<int>*>(flagp)) {
-            if (argv[++i]) {
-                // Validate string looks like an interger
-                if (validateInteger(argv[i])) {
-                    setFlag<int>(flagname, std::stol(argv[i], nullptr, 10));
+            case FlagType::String:
+                if (argv[++i]) {
+                    setFlag<std::string>(flagname, std::string(argv[i]));
                     return PARSE_OK;
                 } else {
-                    std::cout << "Flag '" << flagname << "' expects a value of type integer" << std::endl;
-                    return PARSE_INVALID_FLAG;
+                    std::cout << "Missing value for flag: " << argv[i-1] << std::endl;
+                    return PARSE_ERROR;
                 }
-            } else {
-                std::cout << "Missing value for flag: " << argv[i-1] << std::endl;
-                return PARSE_ERROR;
-            }
+            case FlagType::Int:
+                if (argv[++i]) {
+                    // Validate string looks like an interger
+                    if (validateInteger(argv[i])) {
+                        setFlag<int>(flagname, std::stol(argv[i], nullptr, 10));
+                        return PARSE_OK;
+                    } else {
+                        std::cout << "Flag '" << flagname
+                                  << "' expects a value of type integer" << std::endl;
+                        return PARSE_INVALID_FLAG;
+                    }
+                } else {
+                    std::cout << "Missing value for flag: " << argv[i-1] << std::endl;
+                    return PARSE_ERROR;
+                }
+            case FlagType::Double:
+                if (argv[++i]) {
+                    if (validateDouble(argv[i])) {
+                        setFlag<double>(flagname, std::stod(argv[i]));
+                        return PARSE_OK;
+                    } else {
+                        std::cout << "Flag '" << flagname
+                                  << "' expects a value of type double" << std::endl;
+                        return PARSE_INVALID_FLAG;
+                    }
+                } else {
+                    std::cout << "Missing value for flag: " << argv[i-1] << std::endl;
+                    return PARSE_ERROR;
+                }
         }
 
         std::cout << flagname << " is not of a valid flag type." << std::endl;
@@ -636,21 +693,34 @@ class HorseWhisperer {
 
     // Output the help information related to a single flag
     void writeFlagHelp(const FlagBase* flag) {
-        std::stringstream input(flag->aliases);
-        std::stringstream output;
-        std::string tmp;
+        std::stringstream input { flag->aliases };
+        std::stringstream output {};
+        std::string tmp {};
+        std::string arg {};
+        size_t last_alias_size { 0 };
 
         while (input >> tmp) {
             if (tmp != "") {
-                output << std::endl;
-                output << std::setw(30) << std::left;
+                output << "\n";
+                output << std::setw(DESCRIPTION_MARGIN) << std::left;
 
-                if (tmp.size() == 1) {
-                    output << "   -" + tmp;
-                } else if (tmp.size() > 1) {
-                    output << "  --" + tmp;
+                last_alias_size = tmp.size() + arg.size();
+
+                if (last_alias_size == 1) {
+                    output << "   -" + tmp + arg;
+                } else if (last_alias_size > 1) {
+                    output << "  --" + tmp + arg;
                 }
             }
+        }
+
+        // New line condition: (2 or 3 spaces + dash prefix + alias
+        // size + 2 spaces to separate from description) > margin
+        if (last_alias_size + 6 > DESCRIPTION_MARGIN) {
+            output << "\n";
+            output << std::setw(DESCRIPTION_MARGIN) << std::left;
+            // Same length as above to fill the field in the same way
+            output << "    ";
         }
 
         output << flag->description;
@@ -661,8 +731,9 @@ class HorseWhisperer {
     void writeActionDescription(const Action* action) {
         std::stringstream example;
         example << "  " << action->name;
-        std::cout << std::setw(30) << std::left << example.str()
-                  << std::setw(30) << std::left << action->description << std::endl;
+        std::cout << std::setw(DESCRIPTION_MARGIN) << std::left << example.str()
+                  << std::setw(DESCRIPTION_MARGIN) << std::left
+                  << action->description << std::endl;
     }
 
     bool isFlagDefined(std::string name) {
@@ -692,38 +763,42 @@ class HorseWhisperer {
 // API
 //
 
-template <typename FlagType>
+template <typename Type>
 static void DefineGlobalFlag(std::string aliases,
                                 std::string description,
-                                FlagType default_value,
-                                FlagCallback<FlagType> flag_callback) {
-    HorseWhisperer::Instance().defineGlobalFlag<FlagType>(aliases,
-                                                         description,
-                                                         default_value,
-                                                         flag_callback);
+                                Type default_value,
+                                FlagCallback<Type> flag_callback) {
+    HorseWhisperer::Instance().defineGlobalFlag<Type>(aliases,
+                                                      description,
+                                                      default_value,
+                                                      flag_callback);
 }
 
-template <typename FlagType>
+template <typename Type>
 static void DefineActionFlag(std::string action_name,
                                 std::string aliases,
                                 std::string description,
-                                FlagType default_value,
-                                FlagCallback<FlagType> flag_callback) {
-    HorseWhisperer::Instance().defineActionFlag<FlagType>(action_name,
-                                                          aliases,
-                                                          description,
-                                                          default_value,
-                                                          flag_callback);
+                                Type default_value,
+                                FlagCallback<Type> flag_callback) {
+    HorseWhisperer::Instance().defineActionFlag<Type>(action_name,
+                                                      aliases,
+                                                      description,
+                                                      default_value,
+                                                      flag_callback);
 }
 
-template <typename FlagType>
-static FlagType GetFlag(std::string flag_name) {
-    return HorseWhisperer::Instance().getFlagValue<FlagType>(flag_name);
+template <typename Type>
+static Type GetFlag(std::string flag_name) {
+    return HorseWhisperer::Instance().getFlagValue<Type>(flag_name);
 }
 
-template <typename FlagType>
-static void SetFlag(std::string flag_name, FlagType value) {
-    HorseWhisperer::Instance().setFlag<FlagType>(flag_name, value);
+static FlagType GetFlagType(std::string flag_name) {
+    return HorseWhisperer::Instance().getFlagType(flag_name);
+}
+
+template <typename Type>
+static void SetFlag(std::string flag_name, Type value) {
+    HorseWhisperer::Instance().setFlag<Type>(flag_name, value);
 }
 
 static void DefineAction(std::string action_name,
