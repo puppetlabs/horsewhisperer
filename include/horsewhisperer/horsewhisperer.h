@@ -490,31 +490,14 @@ class HorseWhisperer {
         throw undefined_flag_error { "undefined flag: " + name };
     };
 
-    FlagType getFlagType(std::string flag_name) {
+    FlagType getFlagType(const std::string& flag_name) {
         int context_idx = getContextIdxIfDefined(flag_name);
 
         if (context_idx == NO_CONTEXT_IDX) {
             throw undefined_flag_error { "undefined flag: " + flag_name };
         }
 
-        auto flagp = context_mgr[context_idx]->flags[flag_name];
-        FlagType flag_type { FlagType::Bool };
-
-        // RTTI to determine the flag value type
-        if (dynamic_cast<Flag<bool>*>(flagp)) {
-            flag_type = FlagType::Bool;
-        } else if (dynamic_cast<Flag<std::string>*>(flagp)) {
-            flag_type = FlagType::String;
-        } else if (dynamic_cast<Flag<int>*>(flagp)) {
-            flag_type = FlagType::Int;
-        } else if (dynamic_cast<Flag<double>*>(flagp)) {
-            flag_type = FlagType::Double;
-        } else {
-            // We only support the types in the FlagType enum...
-            assert(false);
-        }
-
-        return flag_type;
+        return getFlagType(context_mgr[context_idx]->flags[flag_name]);
     }
 
     // ALSO check both contexts
@@ -762,6 +745,26 @@ class HorseWhisperer {
 
     bool isActionDefined(std::string name) {
         return !(actions.find(name) == actions.end());
+    }
+
+    FlagType getFlagType(const FlagBase* flagp) {
+        FlagType flag_type { FlagType::Bool };
+
+        // RTTI to determine the flag value type
+        if (dynamic_cast<const Flag<bool>*>(flagp)) {
+            flag_type = FlagType::Bool;
+        } else if (dynamic_cast<const Flag<std::string>*>(flagp)) {
+            flag_type = FlagType::String;
+        } else if (dynamic_cast<const Flag<int>*>(flagp)) {
+            flag_type = FlagType::Int;
+        } else if (dynamic_cast<const Flag<double>*>(flagp)) {
+            flag_type = FlagType::Double;
+        } else {
+            // We only support the types in the FlagType enum...
+            assert(false);
+        }
+
+        return flag_type;
     }
 };
 
