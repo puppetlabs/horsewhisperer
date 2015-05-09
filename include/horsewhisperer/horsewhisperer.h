@@ -259,7 +259,7 @@ class HorseWhisperer {
         global_context->action = nullptr;
         context_mgr.push_back(std::move(global_context));
         current_context_idx = GLOBAL_CONTEXT_IDX;
-        defineGlobalFlag<bool>("h help", "Shows this message", false, nullptr);
+        defineGlobalFlag<bool>("h help", "Show this message", false, nullptr);
         defineGlobalFlag<int>("vlevel", "", 0, nullptr);
         defineGlobalFlag<bool>("verbose", "Set verbose output", false, [this](bool) {setFlag<int>("vlevel", 1); return true;});
     }
@@ -687,27 +687,26 @@ class HorseWhisperer {
         std::cout << help_banner_ << std::endl;
         std::cout << std::endl;
 
-        std::cout << "Global options:" << std::endl;
+        std::cout << "Global options:";
 
         for (const auto& flag : registered_flags_["global"]) {
             writeFlagHelp(flag);
         }
-        std::cout << std::endl << std::endl;
 
-        std::cout << "Actions:" << std::endl << std::endl;
+        std::cout << "\n\nActions:\n";
         for (const auto& action : actions) {
             writeActionDescription(action.second);
         }
 
-        std::cout << std::endl;
+        std::cout << "\n";
 
         for (const auto& context : registered_flags_) {
             if (context.first != "global") {
-                std::cout << context.first << " action options:" << std::endl;
+                std::cout << context.first << " action options:";
                 for (const auto& flag : context.second) {
                     writeFlagHelp(flag);
                 }
-                std::cout << std::endl << std::endl;
+                std::cout << "\n\n";
             }
         }
         std::cout << "For action specific help run \"" << application_name_
