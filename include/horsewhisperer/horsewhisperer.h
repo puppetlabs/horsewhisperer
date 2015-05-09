@@ -220,6 +220,26 @@ static std::vector<std::string> wordWrap(const std::string& txt,
     return lines;
 }
 
+static std::string getActionArgs(int arity) {
+    std::string args_txt {};
+    bool is_variadic { false };
+
+    if (arity < 0) {
+        is_variadic = true;
+        arity = -arity;
+    }
+
+    for (int i = 0; i < arity; i++) {
+        args_txt += " <str>";
+    }
+
+    if (is_variadic) {
+        args_txt += " ...";
+    }
+
+    return args_txt;
+}
+
 //
 // HorseWhisperer
 //
@@ -716,47 +736,90 @@ class HorseWhisperer {
 
     // Output the help information related to a single flag
     void writeFlagHelp(const FlagBase* flag) {
-        std::stringstream input { flag->aliases };
+        std::stringstream aliases_stream { flag->aliases };
         std::stringstream output {};
-        std::string tmp {};
+        std::string alias {};
         std::string arg {};
         size_t last_alias_size { 0 };
 
-        while (input >> tmp) {
-            if (tmp != "") {
-                output << "\n";
-                output << std::setw(DESCRIPTION_MARGIN) << std::left;
+        switch (getFlagType(flag)) {
+            case FlagType::Bool:
+                // No argument
+                break;
+            case FlagType::String:
+                arg = " <str>";
+                break;
+            case FlagType::Int:
+                arg = " <int>";
+                break;
+            case FlagType::Double:
+                arg = " <float>";
+        }
 
-                last_alias_size = tmp.size() + arg.size();
+        while (aliases_stream >> alias) {
+            if (alias != "") {
+                output << "\n";
+                output << std::setw(description_margin_left) << std::left;
+                last_alias_size = alias.size() + arg.size();
 
                 if (last_alias_size == 1) {
-                    output << "   -" + tmp + arg;
+                    output << "   -" + alias + arg;
                 } else if (last_alias_size > 1) {
-                    output << "  --" + tmp + arg;
+                    output << "  --" + alias + arg;
                 }
             }
         }
 
-        // New line condition: (2 or 3 spaces + dash prefix + alias
-        // size + 2 spaces to separate from description) > margin
-        if (last_alias_size + 6 > DESCRIPTION_MARGIN) {
-            output << "\n";
-            output << std::setw(DESCRIPTION_MARGIN) << std::left;
+        auto newLine = [&output](unsigned int margin) {
+            output << "\n" << std::setw(margin) << std::left;
             // Same length as above to fill the field in the same way
             output << "    ";
+        };
+
+        // New line condition: (2 or 3 spaces + dash prefix + alias
+        // size + 2 spaces to separate from description) > margin
+        if (last_alias_size + 6 > description_margin_left) {
+            newLine(description_margin_left);
         }
 
-        output << flag->description;
+        bool first_line { true };
+        for (auto& line : wordWrap(flag->description, getDescriptionWidth())) {
+            if (!first_line) {
+                newLine(description_margin_left);
+            }
+            output << line;
+            first_line = false;
+        }
+
         std::cout << output.str();
     }
 
     // Output the action description related to a specific action
     void writeActionDescription(const Action* action) {
-        std::stringstream example;
-        example << "  " << action->name;
-        std::cout << std::setw(DESCRIPTION_MARGIN) << std::left << example.str()
-                  << std::setw(DESCRIPTION_MARGIN) << std::left
-                  << action->description << std::endl;
+        std::stringstream action_stream;
+        std::string name_and_args { action->name + getActionArgs(action->arity) };
+        action_stream << "  " << name_and_args;
+
+        // New line condition: (2 spaces + action name + action
+        // arguments + 2 spaces to separate from description) > margin
+        if (name_and_args.size() + 4 > description_margin_left) {
+            action_stream << "\n";
+        }
+
+        std::cout << std::setw(description_margin_left) << std::left
+                  << action_stream.str()
+                  << std::setw(description_margin_left) << std::left;
+
+        bool first_line { true };
+        for (auto& line : wordWrap(action->description, getDescriptionWidth())) {
+            if (!first_line) {
+                std::cout << std::setw(description_margin_left) << std::left
+                          << "    "
+                          << std::setw(description_margin_left) << std::left;
+            }
+            std::cout << line << "\n";
+            first_line = false;
+        }
     }
 
     bool isFlagDefined(std::string name) {
