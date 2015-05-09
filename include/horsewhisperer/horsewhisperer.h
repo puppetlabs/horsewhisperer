@@ -196,6 +196,30 @@ static bool validateDouble(const std::string& val) {
     return true;
 }
 
+static std::vector<std::string> wordWrap(const std::string& txt,
+                                         const unsigned int width) {
+    std::istringstream input { txt };
+    std::vector<std::string> lines {};
+    std::string current_word {};
+    std::string current_line {};
+
+    while (getline(input, current_word, ' ')) {
+        if (current_line.size() + current_word.size() >= width) {
+            lines.push_back(current_line);
+            current_line = "  " + current_word;
+        } else {
+            current_word = (current_line.empty() ? "" : " ") + current_word;
+            current_line += current_word;
+        }
+    }
+
+    if (!current_line.empty()) {
+        lines.push_back(current_line);
+    }
+
+    return lines;
+}
+
 //
 // HorseWhisperer
 //
