@@ -61,7 +61,8 @@ static const int PARSE_ERROR = 1;
 static const int PARSE_INVALID_FLAG = 2;
 
 // Right margin for help descriptions
-static const int DESCRIPTION_MARGIN = 30;
+static const unsigned int DESCRIPTION_MARGIN_LEFT_DEFAULT = 30;
+static const unsigned int DESCRIPTION_MARGIN_RIGHT_DEFAULT = 80;
 
 //
 // Types
@@ -167,6 +168,9 @@ static void ShowVersion() __attribute__ ((unused));
 static std::vector<std::string> GetParsedActions() __attribute__ ((unused));
 static int Start() __attribute__ ((unused));
 static void Reset() __attribute__ ((unused));
+static void SetHelpMargins(unsigned int left_margin,
+                           unsigned int right_margin) __attribute__ ((unused));
+
 //
 // Auxiliary Functions
 //
@@ -536,6 +540,10 @@ class HorseWhisperer {
         return action_container;
     }
 
+    void setHelpMargins(unsigned int left_margin, unsigned int right_margin) {description_margin_left = left_margin;
+        description_margin_right = right_margin;
+    }
+
   private:
     int current_context_idx;
     std::vector<ContextPtr> context_mgr;
@@ -546,6 +554,8 @@ class HorseWhisperer {
     std::string application_name_ = "";
     std::string help_banner_ = "";
     std::string version_string_ = "";
+    unsigned int description_margin_left = DESCRIPTION_MARGIN_LEFT_DEFAULT;
+    unsigned int description_margin_right = DESCRIPTION_MARGIN_RIGHT_DEFAULT;
 
     int parseFlag(char* argv[], int& i) {
         // It's a flag. Get the array offset
@@ -766,6 +776,10 @@ class HorseWhisperer {
 
         return flag_type;
     }
+
+    unsigned int getDescriptionWidth() {
+        return description_margin_right - description_margin_left;
+    }
 };
 
 //
@@ -874,6 +888,10 @@ static int Start() {
 
 static void Reset() {
     HorseWhisperer::Instance().reset();
+}
+
+static void SetHelpMargins(unsigned int left_margin, unsigned int right_margin) {
+    HorseWhisperer::Instance().setHelpMargins(left_margin, right_margin);
 }
 
 }  // namespace HorseWhisperer
