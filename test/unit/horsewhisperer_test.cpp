@@ -15,7 +15,7 @@ void prepareAction(std::function<int(std::vector<std::string>)> f) {
     HW::DefineActionFlag<bool>("test-action", "action-get", "a test flag", false, nullptr);
 }
 
-TEST_CASE("reset", "[reset") {
+TEST_CASE("reset", "[reset]") {
     SECTION("Reset resets global flags") {
         prepareGlobal();
         HW::Reset();

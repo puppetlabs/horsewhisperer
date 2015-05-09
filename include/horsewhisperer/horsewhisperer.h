@@ -13,6 +13,7 @@
 #include <functional>
 #include <memory>
 #include <stdexcept>
+
 // To disable assert()
 #define NDEBUG
 #include <cassert>
@@ -127,7 +128,7 @@ struct Context {
 typedef std::unique_ptr<Context> ContextPtr;
 
 //
-// Functions
+// API Declarations
 //
 
 template <typename Type>
@@ -166,6 +167,9 @@ static void ShowVersion() __attribute__ ((unused));
 static std::vector<std::string> GetParsedActions() __attribute__ ((unused));
 static int Start() __attribute__ ((unused));
 static void Reset() __attribute__ ((unused));
+//
+// Auxiliary Functions
+//
 
 // Because regex is busted on a lot of versions of libstdc++ I'm rolling
 // my own integer validation.
@@ -669,14 +673,16 @@ class HorseWhisperer {
                 std::cout << std::endl << std::endl;
             }
         }
-        std::cout << "For action specific help run \"" << application_name_ << " <action> --help\"" << std::endl;
+        std::cout << "For action specific help run \"" << application_name_
+                  << " <action> --help\"" << std::endl;
     }
 
     // Display help information for the current action context
     void actionHelp() {
         if (context_mgr[current_context_idx]->action->help_string_.empty()) {
-            std::cout << "No specific help found for action :" << context_mgr[current_context_idx]->action->name
-                      << std::endl << std::endl;
+            std::cout << "No specific help found for action :"
+                      << context_mgr[current_context_idx]->action->name
+                      << "\n\n";
             return;
         }
 
