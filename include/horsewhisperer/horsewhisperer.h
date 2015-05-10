@@ -799,15 +799,18 @@ class HorseWhisperer {
         std::string name_and_args { action->name + getActionArgs(action->arity) };
         action_stream << "  " << name_and_args;
 
+        std::cout << std::setw(description_margin_left) << std::left
+                  << action_stream.str();
+
         // New line condition: (2 spaces + action name + action
         // arguments + 2 spaces to separate from description) > margin
         if (name_and_args.size() + 4 > description_margin_left) {
-            action_stream << "\n";
+            std::cout << "\n";
+            std::cout << std::setw(description_margin_left) << std::left
+                      << "    ";
         }
 
-        std::cout << std::setw(description_margin_left) << std::left
-                  << action_stream.str()
-                  << std::setw(description_margin_left) << std::left;
+        std::cout << std::setw(description_margin_left) << std::left;
 
         bool first_line { true };
         for (auto& line : wordWrap(action->description, getDescriptionWidth())) {
