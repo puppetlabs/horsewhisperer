@@ -220,26 +220,6 @@ static std::vector<std::string> wordWrap(const std::string& txt,
     return lines;
 }
 
-static std::string getActionArgs(int arity) {
-    std::string args_txt {};
-    bool is_variadic { false };
-
-    if (arity < 0) {
-        is_variadic = true;
-        arity = -arity;
-    }
-
-    for (int i = 0; i < arity; i++) {
-        args_txt += " <str>";
-    }
-
-    if (is_variadic) {
-        args_txt += " ...";
-    }
-
-    return args_txt;
-}
-
 //
 // HorseWhisperer
 //
@@ -796,15 +776,14 @@ class HorseWhisperer {
     // Output the action description related to a specific action
     void writeActionDescription(const Action* action) {
         std::stringstream action_stream;
-        std::string name_and_args { action->name + getActionArgs(action->arity) };
-        action_stream << "  " << name_and_args;
+        action_stream << "  " << action->name;
 
         std::cout << std::setw(description_margin_left) << std::left
                   << action_stream.str();
 
-        // New line condition: (2 spaces + action name + action
-        // arguments + 2 spaces to separate from description) > margin
-        if (name_and_args.size() + 4 > description_margin_left) {
+        // New line condition: (2 spaces + action name + 2 spaces to
+        // separate from description) > margin
+        if (action->name.size() + 4 > description_margin_left) {
             std::cout << "\n";
             std::cout << std::setw(description_margin_left) << std::left
                       << "    ";
