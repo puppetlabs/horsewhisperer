@@ -206,7 +206,7 @@ static std::vector<std::string> wordWrap(const std::string& txt,
     while (getline(input, current_word, ' ')) {
         if (current_line.size() + current_word.size() >= width) {
             lines.push_back(current_line);
-            current_line = "  " + current_word;
+            current_line = current_word;
         } else {
             current_word = (current_line.empty() ? "" : " ") + current_word;
             current_line += current_word;
