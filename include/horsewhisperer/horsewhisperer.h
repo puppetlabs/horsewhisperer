@@ -13,6 +13,7 @@
 #include <functional>
 #include <memory>
 #include <stdexcept>
+
 // To disable assert()
 #define NDEBUG
 #include <cassert>
@@ -60,7 +61,8 @@ static const int PARSE_ERROR = 1;
 static const int PARSE_INVALID_FLAG = 2;
 
 // Right margin for help descriptions
-static const int DESCRIPTION_MARGIN = 30;
+static const unsigned int DESCRIPTION_MARGIN_LEFT_DEFAULT = 30;
+static const unsigned int DESCRIPTION_MARGIN_RIGHT_DEFAULT = 80;
 
 //
 // Types
@@ -127,7 +129,7 @@ struct Context {
 typedef std::unique_ptr<Context> ContextPtr;
 
 //
-// Functions
+// API Declarations
 //
 
 template <typename Type>
@@ -166,6 +168,12 @@ static void ShowVersion() __attribute__ ((unused));
 static std::vector<std::string> GetParsedActions() __attribute__ ((unused));
 static int Start() __attribute__ ((unused));
 static void Reset() __attribute__ ((unused));
+static void SetHelpMargins(unsigned int left_margin,
+                           unsigned int right_margin) __attribute__ ((unused));
+
+//
+// Auxiliary Functions
+//
 
 // Because regex is busted on a lot of versions of libstdc++ I'm rolling
 // my own integer validation.
@@ -188,6 +196,30 @@ static bool validateDouble(const std::string& val) {
     return true;
 }
 
+static std::vector<std::string> wordWrap(const std::string& txt,
+                                         const unsigned int width) {
+    std::istringstream input { txt };
+    std::vector<std::string> lines {};
+    std::string current_word {};
+    std::string current_line {};
+
+    while (getline(input, current_word, ' ')) {
+        if (current_line.size() + current_word.size() >= width) {
+            lines.push_back(current_line);
+            current_line = current_word;
+        } else {
+            current_word = (current_line.empty() ? "" : " ") + current_word;
+            current_line += current_word;
+        }
+    }
+
+    if (!current_line.empty()) {
+        lines.push_back(current_line);
+    }
+
+    return lines;
+}
+
 //
 // HorseWhisperer
 //
@@ -207,7 +239,7 @@ class HorseWhisperer {
         global_context->action = nullptr;
         context_mgr.push_back(std::move(global_context));
         current_context_idx = GLOBAL_CONTEXT_IDX;
-        defineGlobalFlag<bool>("h help", "Shows this message", false, nullptr);
+        defineGlobalFlag<bool>("h help", "Show this message", false, nullptr);
         defineGlobalFlag<int>("vlevel", "", 0, nullptr);
         defineGlobalFlag<bool>("verbose", "Set verbose output", false, [this](bool) {setFlag<int>("vlevel", 1); return true;});
     }
@@ -486,31 +518,14 @@ class HorseWhisperer {
         throw undefined_flag_error { "undefined flag: " + name };
     };
 
-    FlagType getFlagType(std::string flag_name) {
+    FlagType getFlagType(const std::string& flag_name) {
         int context_idx = getContextIdxIfDefined(flag_name);
 
         if (context_idx == NO_CONTEXT_IDX) {
             throw undefined_flag_error { "undefined flag: " + flag_name };
         }
 
-        auto flagp = context_mgr[context_idx]->flags[flag_name];
-        FlagType flag_type { FlagType::Bool };
-
-        // RTTI to determine the flag value type
-        if (dynamic_cast<Flag<bool>*>(flagp)) {
-            flag_type = FlagType::Bool;
-        } else if (dynamic_cast<Flag<std::string>*>(flagp)) {
-            flag_type = FlagType::String;
-        } else if (dynamic_cast<Flag<int>*>(flagp)) {
-            flag_type = FlagType::Int;
-        } else if (dynamic_cast<Flag<double>*>(flagp)) {
-            flag_type = FlagType::Double;
-        } else {
-            // We only support the types in the FlagType enum...
-            assert(false);
-        }
-
-        return flag_type;
+        return getFlagType(context_mgr[context_idx]->flags[flag_name]);
     }
 
     // ALSO check both contexts
@@ -549,6 +564,10 @@ class HorseWhisperer {
         return action_container;
     }
 
+    void setHelpMargins(unsigned int left_margin, unsigned int right_margin) {description_margin_left = left_margin;
+        description_margin_right = right_margin;
+    }
+
   private:
     int current_context_idx;
     std::vector<ContextPtr> context_mgr;
@@ -559,6 +578,8 @@ class HorseWhisperer {
     std::string application_name_ = "";
     std::string help_banner_ = "";
     std::string version_string_ = "";
+    unsigned int description_margin_left = DESCRIPTION_MARGIN_LEFT_DEFAULT;
+    unsigned int description_margin_right = DESCRIPTION_MARGIN_RIGHT_DEFAULT;
 
     int parseFlag(char* argv[], int& i) {
         // It's a flag. Get the array offset
@@ -646,37 +667,27 @@ class HorseWhisperer {
         std::cout << help_banner_ << std::endl;
         std::cout << std::endl;
 
-        std::cout << "Global options:" << std::endl;
+        std::cout << "Global options:";
 
         for (const auto& flag : registered_flags_["global"]) {
             writeFlagHelp(flag);
         }
-        std::cout << std::endl << std::endl;
 
-        std::cout << "Actions:" << std::endl << std::endl;
+        std::cout << "\n\nActions:\n";
         for (const auto& action : actions) {
             writeActionDescription(action.second);
         }
 
-        std::cout << std::endl;
-
-        for (const auto& context : registered_flags_) {
-            if (context.first != "global") {
-                std::cout << context.first << " action options:" << std::endl;
-                for (const auto& flag : context.second) {
-                    writeFlagHelp(flag);
-                }
-                std::cout << std::endl << std::endl;
-            }
-        }
-        std::cout << "For action specific help run \"" << application_name_ << " <action> --help\"" << std::endl;
+        std::cout << "\nFor action specific help run \"" << application_name_
+                  << " <action> --help\"" << std::endl;
     }
 
     // Display help information for the current action context
     void actionHelp() {
         if (context_mgr[current_context_idx]->action->help_string_.empty()) {
-            std::cout << "No specific help found for action :" << context_mgr[current_context_idx]->action->name
-                      << std::endl << std::endl;
+            std::cout << "No specific help found for action :"
+                      << context_mgr[current_context_idx]->action->name
+                      << "\n\n";
             return;
         }
 
@@ -693,47 +704,92 @@ class HorseWhisperer {
 
     // Output the help information related to a single flag
     void writeFlagHelp(const FlagBase* flag) {
-        std::stringstream input { flag->aliases };
+        std::stringstream aliases_stream { flag->aliases };
         std::stringstream output {};
-        std::string tmp {};
+        std::string alias {};
         std::string arg {};
         size_t last_alias_size { 0 };
 
-        while (input >> tmp) {
-            if (tmp != "") {
-                output << "\n";
-                output << std::setw(DESCRIPTION_MARGIN) << std::left;
+        switch (getFlagType(flag)) {
+            case FlagType::Bool:
+                // No argument
+                break;
+            case FlagType::String:
+                arg = " <str>";
+                break;
+            case FlagType::Int:
+                arg = " <int>";
+                break;
+            case FlagType::Double:
+                arg = " <float>";
+        }
 
-                last_alias_size = tmp.size() + arg.size();
+        while (aliases_stream >> alias) {
+            if (alias != "") {
+                output << "\n";
+                output << std::setw(description_margin_left) << std::left;
+                last_alias_size = alias.size() + arg.size();
 
                 if (last_alias_size == 1) {
-                    output << "   -" + tmp + arg;
+                    output << "   -" + alias + arg;
                 } else if (last_alias_size > 1) {
-                    output << "  --" + tmp + arg;
+                    output << "  --" + alias + arg;
                 }
             }
         }
 
-        // New line condition: (2 or 3 spaces + dash prefix + alias
-        // size + 2 spaces to separate from description) > margin
-        if (last_alias_size + 6 > DESCRIPTION_MARGIN) {
-            output << "\n";
-            output << std::setw(DESCRIPTION_MARGIN) << std::left;
+        auto newLine = [&output](unsigned int margin) {
+            output << "\n" << std::setw(margin) << std::left;
             // Same length as above to fill the field in the same way
             output << "    ";
+        };
+
+        // New line condition: (2 or 3 spaces + dash prefix + alias
+        // size + 2 spaces to separate from description) > margin
+        if (last_alias_size + 6 > description_margin_left) {
+            newLine(description_margin_left);
         }
 
-        output << flag->description;
+        bool first_line { true };
+        for (auto& line : wordWrap(flag->description, getDescriptionWidth())) {
+            if (!first_line) {
+                newLine(description_margin_left);
+            }
+            output << line;
+            first_line = false;
+        }
+
         std::cout << output.str();
     }
 
     // Output the action description related to a specific action
     void writeActionDescription(const Action* action) {
-        std::stringstream example;
-        example << "  " << action->name;
-        std::cout << std::setw(DESCRIPTION_MARGIN) << std::left << example.str()
-                  << std::setw(DESCRIPTION_MARGIN) << std::left
-                  << action->description << std::endl;
+        std::stringstream action_stream;
+        action_stream << "  " << action->name;
+
+        std::cout << std::setw(description_margin_left) << std::left
+                  << action_stream.str();
+
+        // New line condition: (2 spaces + action name + 2 spaces to
+        // separate from description) > margin
+        if (action->name.size() + 4 > description_margin_left) {
+            std::cout << "\n";
+            std::cout << std::setw(description_margin_left) << std::left
+                      << "    ";
+        }
+
+        std::cout << std::setw(description_margin_left) << std::left;
+
+        bool first_line { true };
+        for (auto& line : wordWrap(action->description, getDescriptionWidth())) {
+            if (!first_line) {
+                std::cout << std::setw(description_margin_left) << std::left
+                          << "    "
+                          << std::setw(description_margin_left) << std::left;
+            }
+            std::cout << line << "\n";
+            first_line = false;
+        }
     }
 
     bool isFlagDefined(std::string name) {
@@ -756,6 +812,30 @@ class HorseWhisperer {
 
     bool isActionDefined(std::string name) {
         return !(actions.find(name) == actions.end());
+    }
+
+    FlagType getFlagType(const FlagBase* flagp) {
+        FlagType flag_type { FlagType::Bool };
+
+        // RTTI to determine the flag value type
+        if (dynamic_cast<const Flag<bool>*>(flagp)) {
+            flag_type = FlagType::Bool;
+        } else if (dynamic_cast<const Flag<std::string>*>(flagp)) {
+            flag_type = FlagType::String;
+        } else if (dynamic_cast<const Flag<int>*>(flagp)) {
+            flag_type = FlagType::Int;
+        } else if (dynamic_cast<const Flag<double>*>(flagp)) {
+            flag_type = FlagType::Double;
+        } else {
+            // We only support the types in the FlagType enum...
+            assert(false);
+        }
+
+        return flag_type;
+    }
+
+    unsigned int getDescriptionWidth() {
+        return description_margin_right - description_margin_left;
     }
 };
 
@@ -865,6 +945,10 @@ static int Start() {
 
 static void Reset() {
     HorseWhisperer::Instance().reset();
+}
+
+static void SetHelpMargins(unsigned int left_margin, unsigned int right_margin) {
+    HorseWhisperer::Instance().setHelpMargins(left_margin, right_margin);
 }
 
 }  // namespace HorseWhisperer
