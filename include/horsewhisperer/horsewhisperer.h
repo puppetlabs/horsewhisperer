@@ -47,7 +47,7 @@ class flag_validation_error : public horsewhisperer_error {
 // Tokens
 //
 
-static const std::string VERSION_STRING = "0.6.0";
+static const std::string VERSION_STRING = "0.7.0";
 
 // Context indexes
 static const int GLOBAL_CONTEXT_IDX = 0;

@@ -2,6 +2,18 @@
 
 Change history for HorseWhisperer.
 
+# 0.7.0
+
+Released 2015-05-11
+
+* Option arguments are now displayed in the help text
+* Action and option descriptions are now displayed with margins in the help text
+* Added SetHelpMargins function to set the left and right margins of descriptions
+* Added the FlagType enumeration that lists the supported flag types
+* Added GetFlagType function that return, for a given flag, an element of the
+FlagType enumeration indicating the flag type
+* Supporting flags of double type
+
 # 0.6.0
 
 * Added GetParsedActions function that will return a std::vector<std::string> of
