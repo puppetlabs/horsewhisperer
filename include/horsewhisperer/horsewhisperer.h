@@ -678,18 +678,7 @@ class HorseWhisperer {
             writeActionDescription(action.second);
         }
 
-        std::cout << "\n";
-
-        for (const auto& context : registered_flags_) {
-            if (context.first != "global") {
-                std::cout << context.first << " action options:";
-                for (const auto& flag : context.second) {
-                    writeFlagHelp(flag);
-                }
-                std::cout << "\n\n";
-            }
-        }
-        std::cout << "For action specific help run \"" << application_name_
+        std::cout << "\nFor action specific help run \"" << application_name_
                   << " <action> --help\"" << std::endl;
     }
 
