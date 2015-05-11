@@ -216,6 +216,20 @@ TEST_CASE("parse", "[parse]") {
         REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::PARSE_INVALID_FLAG);
     }
 
+    SECTION("returns PARSE_OK when mixing key=value and other flags") {
+        HW::DefineGlobalFlag<int>("foo", "a int test flag", 0, nullptr);
+        HW::DefineGlobalFlag<bool>("bar", "a bool test flag", false, nullptr);
+
+        const char* args[] = { "test-app", "test-action", "--bar", "--foo=5" };
+        REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::PARSE_OK);
+    }
+
+    SECTION("returns PARSE_OK when flag is given as key=value") {
+        HW::DefineGlobalFlag<int>("foo", "a test flag", 0, nullptr);
+        const char* args[] = { "test-app", "test-action", "--foo=5" };
+        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::PARSE_OK);
+    }
+
     HW::DefineAction("new_action", 2, false, "test action", "2 args required!",
                      testActionCallback);
 
