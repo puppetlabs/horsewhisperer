@@ -587,7 +587,7 @@ class HorseWhisperer {
         if (argv[i][1] == '-') {
             ++offset;
         }
-        std::string flagname(&argv[i][offset]);
+        std::string flagname { &argv[i][offset] };
 
         // check if flag looks like key=value
         size_t k_v { flagname.find("=") };
