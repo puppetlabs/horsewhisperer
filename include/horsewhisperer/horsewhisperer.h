@@ -71,7 +71,7 @@ static const unsigned int DESCRIPTION_MARGIN_RIGHT_DEFAULT = 80;
 enum FlagType { Bool, Int, Double, String };
 
 template <typename Type>
-using FlagCallback = std::function<bool(Type)>;
+using FlagCallback = std::function<bool(Type&)>;
 
 using Arguments = std::vector<std::string>;
 
@@ -535,15 +535,11 @@ class HorseWhisperer {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
             Flag<Type>* flagp = static_cast<Flag<Type>*>(context_mgr[context_idx]->flags[name]);
-            Type tmp_value = flagp->value;
-            flagp->value = value;
-
-            // If there is a validation callback, do it
             if (flagp->flag_callback && !flagp->flag_callback(value)) {
-                flagp->value = tmp_value;
                 throw flag_validation_error { "callback for flag '" + name +
                                               "' returned false" };
             }
+            flagp->value = value;
             return;
         }
 
@@ -587,7 +583,17 @@ class HorseWhisperer {
         if (argv[i][1] == '-') {
             ++offset;
         }
-        std::string flagname(&argv[i][offset]);
+        std::string flagname { &argv[i][offset] };
+
+        // check if flag looks like key=value
+        size_t k_v { flagname.find("=") };
+
+        if (k_v != std::string::npos) {
+            flagname = flagname.substr(0, k_v);
+            // += offset to take - or -- into account
+            // increment to get the first char after '='
+            ++k_v += offset;
+        }
 
         //  Deal with special vlevel flags
         if (flagname[0] == 'v') {
@@ -615,47 +621,66 @@ class HorseWhisperer {
             return PARSE_ERROR;
         }
 
-        switch (getFlagType(flagname)) {
-            case FlagType::Bool:
-                setFlag<bool>(flagname, true);
+        std::string value {};
+
+        FlagType flag_type = getFlagType(flagname);
+
+        if (k_v != std::string::npos) {
+            value = &argv[i][k_v];
+        } else if (flag_type != FlagType::Bool && argv[++i]) {
+            // bool shouldn't try and take an argument from argv
+            value = argv[i];
+        }
+
+        return setAndValidateFlag(flag_type, flagname, value);
+    }
+
+    int setAndValidateFlag(FlagType flag_type, std::string flagname,
+                           std::string value) {
+        if (flag_type == FlagType::Bool) {
+            bool b_val { true };
+
+            if (!value.empty()) {
+                // passed as --true_thing=false|true
+                if (value == "false") {
+                    b_val = false;
+                } else if (value != "true") {
+                    std::cout << "Flag '" << flagname
+                              << "' expects a value of 'true' or 'false'"
+                              << std::endl;
+                    return PARSE_ERROR;
+                }
+            }
+            setFlag<bool>(flagname, b_val);
+            return PARSE_OK;
+        } else {
+            if (value.empty()) {
+                std::cout << "Missing value for flag: " << flagname << std::endl;
+                return PARSE_ERROR;
+            }
+
+            if (flag_type == FlagType::String) {
+                setFlag<std::string>(flagname, std::string(value));
                 return PARSE_OK;
-            case FlagType::String:
-                if (argv[++i]) {
-                    setFlag<std::string>(flagname, std::string(argv[i]));
+            } else if (flag_type == FlagType::Int) {
+                if (validateInteger(value)) {
+                    setFlag<int>(flagname, std::stol(value, nullptr, 10));
                     return PARSE_OK;
                 } else {
-                    std::cout << "Missing value for flag: " << argv[i-1] << std::endl;
-                    return PARSE_ERROR;
+                    std::cout << "Flag '" << flagname
+                                << "' expects a value of type integer" << std::endl;
+                    return PARSE_INVALID_FLAG;
                 }
-            case FlagType::Int:
-                if (argv[++i]) {
-                    // Validate string looks like an interger
-                    if (validateInteger(argv[i])) {
-                        setFlag<int>(flagname, std::stol(argv[i], nullptr, 10));
-                        return PARSE_OK;
-                    } else {
-                        std::cout << "Flag '" << flagname
-                                  << "' expects a value of type integer" << std::endl;
-                        return PARSE_INVALID_FLAG;
-                    }
+            } else if (flag_type == FlagType::Double) {
+                if (validateDouble(value)) {
+                    setFlag<double>(flagname, std::stod(value));
+                    return PARSE_OK;
                 } else {
-                    std::cout << "Missing value for flag: " << argv[i-1] << std::endl;
-                    return PARSE_ERROR;
+                    std::cout << "Flag '" << flagname
+                              << "' expects a value of type double" << std::endl;
+                    return PARSE_INVALID_FLAG;
                 }
-            case FlagType::Double:
-                if (argv[++i]) {
-                    if (validateDouble(argv[i])) {
-                        setFlag<double>(flagname, std::stod(argv[i]));
-                        return PARSE_OK;
-                    } else {
-                        std::cout << "Flag '" << flagname
-                                  << "' expects a value of type double" << std::endl;
-                        return PARSE_INVALID_FLAG;
-                    }
-                } else {
-                    std::cout << "Missing value for flag: " << argv[i-1] << std::endl;
-                    return PARSE_ERROR;
-                }
+            }
         }
 
         std::cout << flagname << " is not of a valid flag type." << std::endl;
