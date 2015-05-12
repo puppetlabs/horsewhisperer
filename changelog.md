@@ -2,6 +2,12 @@
 
 Change history for HorseWhisperer.
 
+# 0.8.0
+
+Released 2015-05-12
+
+* Add ability to pass flags in --key=value style
+
 # 0.7.0
 
 Released 2015-05-11
