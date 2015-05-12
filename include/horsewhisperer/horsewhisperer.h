@@ -71,7 +71,7 @@ static const unsigned int DESCRIPTION_MARGIN_RIGHT_DEFAULT = 80;
 enum FlagType { Bool, Int, Double, String };
 
 template <typename Type>
-using FlagCallback = std::function<bool(Type)>;
+using FlagCallback = std::function<bool(Type&)>;
 
 using Arguments = std::vector<std::string>;
 
@@ -535,15 +535,11 @@ class HorseWhisperer {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
             Flag<Type>* flagp = static_cast<Flag<Type>*>(context_mgr[context_idx]->flags[name]);
-            Type tmp_value = flagp->value;
-            flagp->value = value;
-
-            // If there is a validation callback, do it
             if (flagp->flag_callback && !flagp->flag_callback(value)) {
-                flagp->value = tmp_value;
                 throw flag_validation_error { "callback for flag '" + name +
                                               "' returned false" };
             }
+            flagp->value = value;
             return;
         }
 
