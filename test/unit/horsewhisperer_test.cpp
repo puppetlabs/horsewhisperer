@@ -7,19 +7,22 @@ void prepareGlobal() {
     // configure horsewhisperer
     HW::SetAppName("test-app");
     HW::DefineGlobalFlag<bool>("global-get", "a test flag", false, nullptr);
-    HW::DefineGlobalFlag<int>("global-bad-flag", "a bad test flag", false, nullptr);
+    HW::DefineGlobalFlag<int>("global-bad-flag", "a bad test flag",
+                              false, nullptr);
 }
 
 void prepareAction(std::function<int(std::vector<std::string>)> f) {
-    HW::DefineAction("test-action", 0, false, "test-action", "no help", f);
-    HW::DefineActionFlag<bool>("test-action", "action-get", "a test flag", false, nullptr);
+    HW::DefineAction("test-action", 0, false, "no description", "no help", f);
+    HW::DefineActionFlag<bool>("test-action", "action-get", "a test flag",
+                               false, nullptr);
 }
 
 TEST_CASE("reset", "[reset]") {
     SECTION("Reset resets global flags") {
         prepareGlobal();
         HW::Reset();
-        REQUIRE_THROWS_AS(HW::GetFlag<bool>("global-get"), HW::undefined_flag_error);
+        REQUIRE_THROWS_AS(HW::GetFlag<bool>("global-get"),
+                          HW::undefined_flag_error);
     }
 }
 
@@ -32,7 +35,8 @@ TEST_CASE("global GetFlag", "[global getflag]") {
     }
 
     SECTION("it throws an exception when trying to access and undefined flag") {
-        REQUIRE_THROWS_AS(HW::GetFlag<bool>("not-global-get"), HW::undefined_flag_error);
+        REQUIRE_THROWS_AS(HW::GetFlag<bool>("not-global-get"),
+                          HW::undefined_flag_error);
     }
 }
 
@@ -142,7 +146,8 @@ int getTest(std::vector<std::string>) {
         REQUIRE(HW::GetFlag<bool>("action-get") == false);
         // check global flag context
         REQUIRE(HW::GetFlag<bool>("global-get") == false);
-        REQUIRE_THROWS_AS(HW::GetFlag<bool>("not-action-get"), HW::undefined_flag_error);
+        REQUIRE_THROWS_AS(HW::GetFlag<bool>("not-action-get"),
+                          HW::undefined_flag_error);
     }
     return 0;
 }
@@ -152,6 +157,7 @@ TEST_CASE("action GetFlag", "[action getflag]") {
     prepareGlobal();
     prepareAction(getTest);
     const char* action[] = { "test-app", "test-action" };
+
     // duck around Wc++11-compat-deprecated-writable-strings
     HW::Parse(2, const_cast<char**>(action));
     HW::Start();
@@ -161,7 +167,8 @@ int setTest(std::vector<std::string>) {
     SECTION("it set's an action specific flag") {
         HW::SetFlag<bool>("action-get", true);
         REQUIRE(HW::GetFlag<bool>("action-get") == true);
-        REQUIRE_THROWS_AS(HW::SetFlag<bool>("not-action-set", false), HW::undefined_flag_error);
+        REQUIRE_THROWS_AS(HW::SetFlag<bool>("not-action-set", false),
+                          HW::undefined_flag_error);
     }
     return 0;
 }
@@ -172,24 +179,19 @@ TEST_CASE("action SetFlag", "[action setflag]") {
     prepareAction(setTest);
     const char* action[] = { "test-app", "test-action" };
 
-    HorseWhisperer::DefineAction("test-action", 0, false, "test-action", "no help",
-                                  setTest);
-    HorseWhisperer::DefineActionFlag<bool>("test-action", "action-get",
-                                           "a test flag", false, nullptr);
     // duck around Wc++11-compat-deprecated-writable-strings
     HW::Parse(2, const_cast<char**>(action));
     HW::Start();
 }
 
 int testActionCallback(std::vector<std::string> args) {
-    std::cout << "### inside!!!\n";
-
     return 0;
 }
 
 TEST_CASE("parse", "[parse]") {
     HW::Reset();
     prepareGlobal();
+    prepareAction(nullptr);
 
     SECTION("returns PARSE_OK on success") {
         const char* args[] = { "test-app", "test-action"};
@@ -255,39 +257,64 @@ TEST_CASE("parse", "[parse]") {
     }
 }
 
+auto action_callback = [](std::vector<std::string>) -> int { return 0; };
+
 TEST_CASE("HorseWhisperer::getActions" "[getActions]") {
     HW::Reset();
     prepareGlobal();
-
-    HorseWhisperer::DefineAction("new_action_2", 0, false, "test-action", "no help",
-                                 [](std::vector<std::string>) -> int
-                                        { return 0; });
+    HorseWhisperer::DefineAction("new_action", 2, true, "no description",
+                                 "no help", action_callback);
 
     SECTION("returns a vector containing a single action name") {
         const char* args[] = { "test-app", "new_action", "spam", "eggs" };
+        std::vector<std::string> test_result { "new_action" };
         HW::Parse(4, const_cast<char**>(args));
-        REQUIRE(HW::GetParsedActions() == std::vector<std::string> { "new_action" });
+        REQUIRE(HW::GetParsedActions() == test_result);
     }
 
-    SECTION("returns a vector containing a single action name") {
-        const char* args[] = { "test-app", "new_action", "spam", "eggs" "+",
+    HorseWhisperer::DefineAction("new_action_2", 0, true, "no description",
+                                  "no help", action_callback);
+
+    SECTION("returns multiple action names") {
+        const char* args[] = { "test-app", "new_action", "spam", "eggs",
                                "new_action_2" };
+        std::vector<std::string> test_result { "new_action", "new_action_2" };
+        HW::Parse(5, const_cast<char**>(args));
+        REQUIRE(HW::GetParsedActions() == test_result);
+    }
+
+    std::vector<std::string> delim { "+" };
+    HW::SetDelimiters(delim);
+
+    SECTION("works properly with user-defined delimiters") {
+        const char* args[] = { "test-app", "new_action", "foo", "bar",
+                               "+", "new_action_2" };
         std::vector<std::string> test_result { "new_action", "new_action_2" };
         HW::Parse(6, const_cast<char**>(args));
         REQUIRE(HW::GetParsedActions() == test_result);
     }
 
+    SECTION("returns duplicate actions") {
+        const char* args[] = { "test-app", "new_action", "foo", "bar",
+                               "+", "new_action_2",
+                               "+", "new_action", "spam", "eggs" };
+        std::vector<std::string> test_result { "new_action", "new_action_2",
+                                               "new_action" };
+        HW::Parse(10, const_cast<char**>(args));
+        REQUIRE(HW::GetParsedActions() == test_result);
+    }
 }
 
 TEST_CASE("HorseWhisperer::Start", "[start]") {
     HW::Reset();
     prepareGlobal();
+
     SECTION("it executes an action") {
-        HW::Reset();
         int modify_me = 0;
-        HorseWhisperer::DefineAction("start_test_1", 0, false, "test-action", "no help",
-                                     [&modify_me](std::vector<std::string>) -> int
-                                        { return ++modify_me; });
+        HW::DefineAction("start_test_1", 0, false, "test-action", "no help",
+                         [&modify_me](std::vector<std::string>) -> int {
+                            return ++modify_me; });
+
         const char* cli[] = { "test-app", "start_test_1" };
         HW::Parse(2, const_cast<char**>(cli));
         HW::Start();
@@ -295,20 +322,18 @@ TEST_CASE("HorseWhisperer::Start", "[start]") {
     }
 
     SECTION("it can chain actions") {
-        HW::Reset();
-
         int modify_me1 = 0;
         int modify_me2 = 1;
         std::vector<std::string> delim { "+" };
-        HorseWhisperer::SetDelimiters(delim);
+        HW::SetDelimiters(delim);
 
-        HorseWhisperer::DefineAction("chain_test_1", 0, true, "test-action", "no help",
-                                     [&modify_me1](std::vector<std::string>) -> int
-                                        { ++modify_me1; return 0;});
+        HW::DefineAction("chain_test_1", 0, true, "test-action", "no help",
+                         [&modify_me1](std::vector<std::string>) -> int {
+                            ++modify_me1; return 0; });
 
-        HorseWhisperer::DefineAction("chain_test_2", 0, true, "test-action", "no help",
-                                     [&modify_me2](std::vector<std::string>) -> int
-                                        { ++modify_me2; return 0;});
+        HW::DefineAction("chain_test_2", 0, true, "test-action", "no help",
+                         [&modify_me2](std::vector<std::string>) -> int {
+                            ++modify_me2; return 0; });
 
         const char* cli[] = { "test-app", "chain_test_1", "+", "chain_test_2" };
         HW::Parse(4, const_cast<char**>(cli));
