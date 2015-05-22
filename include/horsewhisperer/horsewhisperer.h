@@ -117,6 +117,8 @@ struct Action {
     bool chainable;
 };
 
+static FlagType getTypeOfFlag(const FlagBase* flagp);
+
 struct Context {
     // Flags defined for the given context
     std::map<std::string, FlagBase*> flags;
@@ -124,6 +126,36 @@ struct Context {
     Action* action;
     // Action arguments
     Arguments arguments;
+
+    std::string toString() {
+        std::stringstream ss {};
+        ss << "Action " << action->name;
+        if (arguments.size() > 0) {
+            ss << "  - arguments:";
+            for (auto& arg : arguments) {
+                ss << " " << arg;
+            }
+        }
+        if (flags.size() > 0) {
+            for (auto& k_v : flags) {
+                ss << "\n  flag " << k_v.first << ": ";
+                switch (getTypeOfFlag(k_v.second)) {
+                    case FlagType::Bool:
+                        ss << static_cast<Flag<bool>*>(k_v.second)->value;
+                        break;
+                    case FlagType::String:
+                        ss << static_cast<Flag<std::string>*>(k_v.second)->value;
+                        break;
+                    case FlagType::Int:
+                        ss << static_cast<Flag<int>*>(k_v.second)->value;
+                        break;
+                    case FlagType::Double:
+                        ss << static_cast<Flag<double>*>(k_v.second)->value;
+                }
+            }
+        }
+        return ss.str();
+    }
 };
 
 typedef std::unique_ptr<Context> ContextPtr;
@@ -218,6 +250,26 @@ static std::vector<std::string> wordWrap(const std::string& txt,
     }
 
     return lines;
+}
+
+static FlagType getTypeOfFlag(const FlagBase* flagp) {
+    FlagType flag_type { FlagType::Bool };
+
+    // RTTI to determine the flag value type
+    if (dynamic_cast<const Flag<bool>*>(flagp)) {
+        flag_type = FlagType::Bool;
+    } else if (dynamic_cast<const Flag<std::string>*>(flagp)) {
+        flag_type = FlagType::String;
+    } else if (dynamic_cast<const Flag<int>*>(flagp)) {
+        flag_type = FlagType::Int;
+    } else if (dynamic_cast<const Flag<double>*>(flagp)) {
+        flag_type = FlagType::Double;
+    } else {
+        // We only support the types in the FlagType enum...
+        assert(false);
+    }
+
+    return flag_type;
 }
 
 //
@@ -518,14 +570,14 @@ class HorseWhisperer {
         throw undefined_flag_error { "undefined flag: " + name };
     };
 
-    FlagType getFlagType(const std::string& flag_name) {
+    FlagType checkAndGetTypeOfFlag(const std::string& flag_name) {
         int context_idx = getContextIdxIfDefined(flag_name);
 
         if (context_idx == NO_CONTEXT_IDX) {
             throw undefined_flag_error { "undefined flag: " + flag_name };
         }
 
-        return getFlagType(context_mgr[context_idx]->flags[flag_name]);
+        return getTypeOfFlag(context_mgr_[context_idx]->flags[flag_name]);
     }
 
     // ALSO check both contexts
@@ -562,6 +614,18 @@ class HorseWhisperer {
 
     void setHelpMargins(unsigned int left_margin, unsigned int right_margin) {description_margin_left = left_margin;
         description_margin_right = right_margin;
+    }
+
+    // Debug method
+    void printState() {
+        std::stringstream ss {};
+        ss << "Current context index = " << std::to_string(current_context_idx_);
+        if (context_mgr_.size() > 1) {
+            for (size_t idx = 1; idx < context_mgr_.size(); idx++) {
+                ss << "\n" << context_mgr_[idx]->toString();
+            }
+        }
+        std::cout << ss.str() << "\n";
     }
 
   private:
@@ -623,7 +687,7 @@ class HorseWhisperer {
 
         std::string value {};
 
-        FlagType flag_type = getFlagType(flagname);
+        FlagType flag_type = checkAndGetTypeOfFlag(flagname);
 
         if (k_v != std::string::npos) {
             value = &argv[i][k_v];
@@ -735,7 +799,7 @@ class HorseWhisperer {
         std::string arg {};
         size_t last_alias_size { 0 };
 
-        switch (getFlagType(flag)) {
+        switch (getTypeOfFlag(flag)) {
             case FlagType::Bool:
                 // No argument
                 break;
@@ -836,27 +900,7 @@ class HorseWhisperer {
     }
 
     bool isActionDefined(std::string name) {
-        return !(actions.find(name) == actions.end());
-    }
-
-    FlagType getFlagType(const FlagBase* flagp) {
-        FlagType flag_type { FlagType::Bool };
-
-        // RTTI to determine the flag value type
-        if (dynamic_cast<const Flag<bool>*>(flagp)) {
-            flag_type = FlagType::Bool;
-        } else if (dynamic_cast<const Flag<std::string>*>(flagp)) {
-            flag_type = FlagType::String;
-        } else if (dynamic_cast<const Flag<int>*>(flagp)) {
-            flag_type = FlagType::Int;
-        } else if (dynamic_cast<const Flag<double>*>(flagp)) {
-            flag_type = FlagType::Double;
-        } else {
-            // We only support the types in the FlagType enum...
-            assert(false);
-        }
-
-        return flag_type;
+        return !(actions_.find(name) == actions_.end());
     }
 
     unsigned int getDescriptionWidth() {
@@ -898,7 +942,7 @@ static Type GetFlag(std::string flag_name) {
 }
 
 static FlagType GetFlagType(std::string flag_name) {
-    return HorseWhisperer::Instance().getFlagType(flag_name);
+    return HorseWhisperer::Instance().checkAndGetTypeOfFlag(flag_name);
 }
 
 template <typename Type>
