@@ -60,7 +60,7 @@ static const int PARSE_VERSION = -2;
 static const int PARSE_ERROR = 1;
 static const int PARSE_INVALID_FLAG = 2;
 
-// Right margin for help descriptions
+// Margins for help descriptions
 static const unsigned int DESCRIPTION_MARGIN_LEFT_DEFAULT = 30;
 static const unsigned int DESCRIPTION_MARGIN_RIGHT_DEFAULT = 80;
 
@@ -306,7 +306,8 @@ class HorseWhisperer {
 
     void setVersionString(std::string version_string) {
         version_string_ = version_string;
-        defineGlobalFlag<bool>("version", "Display version information", false, nullptr);
+        defineGlobalFlag<bool>("version", "Display version information", false,
+                               nullptr);
     }
 
     void setDelimiters(std::vector<std::string> delimiters) {
@@ -346,14 +347,14 @@ class HorseWhisperer {
                 if (parse_flag_outcome != PARSE_OK) {
                     return parse_flag_outcome;
                 }
-            } else if (isDelimiter(argv[arg_idx])) { // skip over delimiter
+            } else if (isDelimiter(argv[arg_idx])) {  // skip over delimiter
                 continue;
             } else {
                 std::string action = argv[arg_idx];
                 if (isActionDefined(action)) {
-                    ContextPtr action_context {new Context()};
                     action_context->flags = actions[argv[arg_idx]]->flags;
                     action_context->action = actions[argv[arg_idx]];
+                    ContextPtr action_context { new Context() };
                     action_context->arguments = Arguments {};
                     context_mgr.push_back(std::move(action_context));
                     current_context_idx++;
@@ -362,22 +363,22 @@ class HorseWhisperer {
 
                     // parse arguments and action flags
                     int arity = context_mgr[current_context_idx]->action->arity;
-                    if (arity > 0) { // iff read parameters = arity
+                    if (arity > 0) {  // iff read parameters = arity
                         while (arity > 0) {
                             ++arg_idx;
-                            if (arg_idx >= argc) { // have we run out of tokens?
+                            if (arg_idx >= argc) {  // have we run out of tokens?
                                 break;
-                            } else if (argv[arg_idx][0] == '-') { // is it a flag token?
+                            } else if (argv[arg_idx][0] == '-') {  // is it a flag token?
                                 int parse_flag_outcome { parseFlag(argv, arg_idx ) };
                                 if (parse_flag_outcome != PARSE_OK) {
                                     return parse_flag_outcome;
                                 }
-                            } else if (isActionDefined(argv[arg_idx])) { // is it an action?
+                            } else if (isActionDefined(argv[arg_idx])) {  // is it an action?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found action: " << argv[arg_idx] << std::endl;
                                 return PARSE_ERROR;
                             } else if (std::find(delimiters_.begin(), delimiters_.end(),
-                                                 argv[arg_idx]) != delimiters_.end()) { // is it a delimiter?
+                                                 argv[arg_idx]) != delimiters_.end()) {  // is it a delimiter?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found delimiter: " << argv[arg_idx] << std::endl;
                                 return PARSE_ERROR;
@@ -394,7 +395,7 @@ class HorseWhisperer {
                                       << "." << std::endl;
                             return PARSE_ERROR;
                         }
-                    } else if (arity < 0) { // if read parameters at least = arity
+                    } else if (arity < 0) {  // if read parameters at least = arity
                         // When arity is an "at least" representation we eat arguments
                         // until we either run out or until we hit a delimiter.
 
@@ -488,10 +489,11 @@ class HorseWhisperer {
                         std::cout << "Not starting action '" << context_mgr[i]->action->name
                                   << "'. Previous action failed to complete successfully." << std::endl;
                     } else {
-                        // Record the current_context_idx. calling parse inside an action_callback
-                        // allows the context list to grow during execution but has the side effect of
-                        // mutating the current_context_index.
                         int tmp = current_context_idx;
+                        // Record the current_context_idx_. Calling parse inside
+                        // an action_callback allows the context list to grow
+                        // during execution but has the side effect of mutating
+                        // the current_context_index.
                         // Flip it because success is 0
                         previous_result = !context_mgr[i]->action->action_callback(context_mgr[i]->arguments);
                         current_context_idx = tmp;
@@ -502,7 +504,8 @@ class HorseWhisperer {
                 }
            }
         } else {
-            std::cout << "No action specified. See \"" << application_name_ << " --help\" for available actions." << std::endl;
+            std::cout << "No action specified. See \"" << application_name_
+                      << " --help\" for available actions." << std::endl;
         }
 
         return !previous_result;
@@ -517,7 +520,7 @@ class HorseWhisperer {
         flagp->description = description;
         flagp->flag_callback = flag_callback;
         // Aliases are space separated
-        std::istringstream iss(aliases);
+        std::istringstream iss { aliases };
         while (iss) {
             std::string tmp;
             iss >> tmp;
@@ -539,7 +542,7 @@ class HorseWhisperer {
         flagp->description = description;
         flagp->flag_callback = flag_callback;
         // Aliases are space separated
-        std::istringstream iss(aliases);
+        std::istringstream iss { aliases };
         std::string tmp;
         while (iss >> tmp) {
             actions[action_name]->flags[tmp] = flagp;
@@ -547,8 +550,10 @@ class HorseWhisperer {
         registered_flags_[action_name].push_back(flagp);
     }
 
-    void defineAction(std::string name, int arity, bool chainable, std::string description, std::string help_string,
-                      ActionCallback action_callback, ArgumentsCallback arguments_callback) {
+    void defineAction(std::string name, int arity, bool chainable,
+                      std::string description, std::string help_string,
+                      ActionCallback action_callback,
+                      ArgumentsCallback arguments_callback) {
         Action* actionp = new Action();
         actionp->name = name;
         actionp->arity = arity;
