@@ -345,8 +345,35 @@ class HorseWhisperer {
             } else {
                 std::string action = argv[arg_idx];
                 if (isActionDefined(action)) {
-                    action_context->flags = actions_[argv[arg_idx]]->flags;
                     ContextPtr action_context { new Context() };
+                    action_context->flags = std::map<std::string, FlagBase*> {};
+
+                    // Copy the specific action flags, so that, in case this
+                    // action has been chained multiple times, each context
+                    // will have a different flag instace, thus allowing to
+                    // parse and store different flag values - example:
+                    // `app_name action_1 --flag_a foo + action_1 --flag_a bar`
+                    for (auto& k_v : actions_[argv[arg_idx]]->flags) {
+                        switch (getTypeOfFlag(k_v.second)) {
+                            case FlagType::Bool:
+                                action_context->flags[k_v.first] = new Flag<bool>(
+                                    *(static_cast<Flag<bool>*>(k_v.second)));
+                                break;
+                            case FlagType::String:
+                                action_context->flags[k_v.first] = new Flag<std::string>(
+                                    *(static_cast<Flag<std::string>*>(k_v.second)));
+                                break;
+                            case FlagType::Int:
+                                action_context->flags[k_v.first] = new Flag<int>(
+                                    *(static_cast<Flag<int>*>(k_v.second)));
+                                break;
+                            case FlagType::Double:
+                                action_context->flags[k_v.first] = new Flag<double>(
+                                    *(static_cast<Flag<double>*>(k_v.second)));
+                                break;
+                        }
+                    }
+
                     action_context->action = actions_[argv[arg_idx]];
                     action_context->arguments = Arguments {};
                     context_mgr_.push_back(std::move(action_context));

@@ -341,4 +341,40 @@ TEST_CASE("HorseWhisperer::Start", "[start]") {
         REQUIRE(modify_me1 == 1);
         REQUIRE(modify_me2 == 2);
     }
+
+    SECTION("chained actions have confined flags and arguments") {
+        int call_counter = 0;
+
+        auto a_c = [&call_counter](std::vector<std::string> args) -> int {
+            REQUIRE(args.size() == 1);
+            auto t_v = HW::GetFlag<std::string>("test_flag");
+            if (call_counter == 0) {
+                REQUIRE(args[0] == "arg_one");
+                REQUIRE(t_v == "spam");
+            } else if (call_counter == 1) {
+                REQUIRE(args[0] == "arg_two");
+                REQUIRE(t_v == "eggs");
+            } else if (call_counter == 2) {
+                REQUIRE(args[0] == "arg_three");
+                REQUIRE(t_v == "beans");
+            } else {
+                REQUIRE(false);
+            }
+            call_counter++;
+            return 0;
+        };
+
+        HW::DefineAction("chain_test_3", 1, true, "test-action", "no help", a_c);
+        HW::DefineActionFlag<std::string>("chain_test_3", "test_flag",
+                                          "no description", "foo", nullptr);
+
+        const char* cli[] = { "test-app",
+                              "chain_test_3", "arg_one", "--test_flag", "spam",
+                              "chain_test_3", "arg_two", "--test_flag", "eggs",
+                              "chain_test_3", "arg_three", "--test_flag", "beans" };
+
+        HW::Parse(13, const_cast<char**>(cli));
+        HW::Start();
+        REQUIRE(call_counter == 3);
+    }
 }
