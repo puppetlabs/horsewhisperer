@@ -60,7 +60,7 @@ static const int PARSE_VERSION = -2;
 static const int PARSE_ERROR = 1;
 static const int PARSE_INVALID_FLAG = 2;
 
-// Right margin for help descriptions
+// Margins for help descriptions
 static const unsigned int DESCRIPTION_MARGIN_LEFT_DEFAULT = 30;
 static const unsigned int DESCRIPTION_MARGIN_RIGHT_DEFAULT = 80;
 
@@ -117,6 +117,8 @@ struct Action {
     bool chainable;
 };
 
+static FlagType getTypeOfFlag(const FlagBase* flagp);
+
 struct Context {
     // Flags defined for the given context
     std::map<std::string, FlagBase*> flags;
@@ -124,6 +126,36 @@ struct Context {
     Action* action;
     // Action arguments
     Arguments arguments;
+
+    std::string toString() {
+        std::stringstream ss {};
+        ss << "Action " << action->name;
+        if (arguments.size() > 0) {
+            ss << "  - arguments:";
+            for (auto& arg : arguments) {
+                ss << " " << arg;
+            }
+        }
+        if (flags.size() > 0) {
+            for (auto& k_v : flags) {
+                ss << "\n  flag " << k_v.first << ": ";
+                switch (getTypeOfFlag(k_v.second)) {
+                    case FlagType::Bool:
+                        ss << static_cast<Flag<bool>*>(k_v.second)->value;
+                        break;
+                    case FlagType::String:
+                        ss << static_cast<Flag<std::string>*>(k_v.second)->value;
+                        break;
+                    case FlagType::Int:
+                        ss << static_cast<Flag<int>*>(k_v.second)->value;
+                        break;
+                    case FlagType::Double:
+                        ss << static_cast<Flag<double>*>(k_v.second)->value;
+                }
+            }
+        }
+        return ss.str();
+    }
 };
 
 typedef std::unique_ptr<Context> ContextPtr;
@@ -220,6 +252,26 @@ static std::vector<std::string> wordWrap(const std::string& txt,
     return lines;
 }
 
+static FlagType getTypeOfFlag(const FlagBase* flagp) {
+    FlagType flag_type { FlagType::Bool };
+
+    // RTTI to determine the flag value type
+    if (dynamic_cast<const Flag<bool>*>(flagp)) {
+        flag_type = FlagType::Bool;
+    } else if (dynamic_cast<const Flag<std::string>*>(flagp)) {
+        flag_type = FlagType::String;
+    } else if (dynamic_cast<const Flag<int>*>(flagp)) {
+        flag_type = FlagType::Int;
+    } else if (dynamic_cast<const Flag<double>*>(flagp)) {
+        flag_type = FlagType::Double;
+    } else {
+        // We only support the types in the FlagType enum...
+        assert(false);
+    }
+
+    return flag_type;
+}
+
 //
 // HorseWhisperer
 //
@@ -232,16 +284,16 @@ class HorseWhisperer {
         return instance;
     }
 
-    // No args constructor creates the pointer to the root context and implicitly
-    // declares the --help flag.
+    // No args constructor creates the pointer to the root context and
+    // implicitly declares the --help flag.
+    // Initializations are performed by init().
     HorseWhisperer() {
-        ContextPtr global_context {new Context()};
-        global_context->action = nullptr;
-        context_mgr.push_back(std::move(global_context));
-        current_context_idx = GLOBAL_CONTEXT_IDX;
-        defineGlobalFlag<bool>("h help", "Show this message", false, nullptr);
-        defineGlobalFlag<int>("vlevel", "", 0, nullptr);
-        defineGlobalFlag<bool>("verbose", "Set verbose output", false, [this](bool) {setFlag<int>("vlevel", 1); return true;});
+        init();
+    }
+
+    void reset() {
+        clean();
+        init();
     }
 
     void setAppName(std::string name) {
@@ -254,7 +306,8 @@ class HorseWhisperer {
 
     void setVersionString(std::string version_string) {
         version_string_ = version_string;
-        defineGlobalFlag<bool>("version", "Display version information", false, nullptr);
+        defineGlobalFlag<bool>("version", "Display version information", false,
+                               nullptr);
     }
 
     void setDelimiters(std::vector<std::string> delimiters) {
@@ -262,28 +315,21 @@ class HorseWhisperer {
     }
 
     bool isDelimiter(const char* argument) {
-        if (std::find(delimiters_.begin(), delimiters_.end(), argument) != delimiters_.end()) {
+        if (std::find(delimiters_.begin(), delimiters_.end(), argument)
+                != delimiters_.end()) {
             return true;
         }
         return false;
     }
 
     bool isActionFlag(std::string action, std::string flagname) {
-        for (const auto& flag : actions[action]->flags) {
+        for (const auto& flag : actions_[action]->flags) {
             if (flagname.compare(flag.first) == 0) {
                 return true;
             }
         }
 
         return false;
-    }
-
-    void reset() {
-        context_mgr.clear();
-        ContextPtr global_context { new Context() };
-        global_context->action = nullptr;
-        context_mgr.push_back(std::move(global_context));
-        current_context_idx = GLOBAL_CONTEXT_IDX;
     }
 
     int parse(int argc, char* argv[]) {
@@ -294,55 +340,83 @@ class HorseWhisperer {
                 if (parse_flag_outcome != PARSE_OK) {
                     return parse_flag_outcome;
                 }
-            } else if (isDelimiter(argv[arg_idx])) { // skip over delimiter
+            } else if (isDelimiter(argv[arg_idx])) {  // skip over delimiter
                 continue;
             } else {
                 std::string action = argv[arg_idx];
                 if (isActionDefined(action)) {
-                    ContextPtr action_context {new Context()};
-                    action_context->flags = actions[argv[arg_idx]]->flags;
-                    action_context->action = actions[argv[arg_idx]];
-                    action_context->arguments = Arguments {};
-                    context_mgr.push_back(std::move(action_context));
-                    current_context_idx++;
+                    ContextPtr action_context { new Context() };
+                    action_context->flags = std::map<std::string, FlagBase*> {};
 
-                    assert(current_context_idx == context_mgr.size() - 1);
+                    // Copy the specific action flags, so that, in case this
+                    // action has been chained multiple times, each context
+                    // will have a different flag instace, thus allowing to
+                    // parse and store different flag values - example:
+                    // `app_name action_1 --flag_a foo + action_1 --flag_a bar`
+                    for (auto& k_v : actions_[argv[arg_idx]]->flags) {
+                        switch (getTypeOfFlag(k_v.second)) {
+                            case FlagType::Bool:
+                                action_context->flags[k_v.first] = new Flag<bool>(
+                                    *(static_cast<Flag<bool>*>(k_v.second)));
+                                break;
+                            case FlagType::String:
+                                action_context->flags[k_v.first] = new Flag<std::string>(
+                                    *(static_cast<Flag<std::string>*>(k_v.second)));
+                                break;
+                            case FlagType::Int:
+                                action_context->flags[k_v.first] = new Flag<int>(
+                                    *(static_cast<Flag<int>*>(k_v.second)));
+                                break;
+                            case FlagType::Double:
+                                action_context->flags[k_v.first] = new Flag<double>(
+                                    *(static_cast<Flag<double>*>(k_v.second)));
+                                break;
+                        }
+                    }
+
+                    action_context->action = actions_[argv[arg_idx]];
+                    action_context->arguments = Arguments {};
+                    context_mgr_.push_back(std::move(action_context));
+                    current_context_idx_++;
+
+                    assert(current_context_idx_ == context_mgr_.size() - 1);
 
                     // parse arguments and action flags
-                    int arity = context_mgr[current_context_idx]->action->arity;
-                    if (arity > 0) { // iff read parameters = arity
+                    int arity = context_mgr_[current_context_idx_]->action->arity;
+                    if (arity > 0) {  // iff read parameters = arity
                         while (arity > 0) {
                             ++arg_idx;
-                            if (arg_idx >= argc) { // have we run out of tokens?
+                            if (arg_idx >= argc) {  // have we run out of tokens?
                                 break;
-                            } else if (argv[arg_idx][0] == '-') { // is it a flag token?
+                            } else if (argv[arg_idx][0] == '-') {  // is it a flag token?
                                 int parse_flag_outcome { parseFlag(argv, arg_idx ) };
                                 if (parse_flag_outcome != PARSE_OK) {
                                     return parse_flag_outcome;
                                 }
-                            } else if (isActionDefined(argv[arg_idx])) { // is it an action?
+                            } else if (isActionDefined(argv[arg_idx])) {  // is it an action?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found action: " << argv[arg_idx] << std::endl;
                                 return PARSE_ERROR;
                             } else if (std::find(delimiters_.begin(), delimiters_.end(),
-                                                 argv[arg_idx]) != delimiters_.end()) { // is it a delimiter?
+                                                 argv[arg_idx]) != delimiters_.end()) {  // is it a delimiter?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found delimiter: " << argv[arg_idx] << std::endl;
                                 return PARSE_ERROR;
                             } else {
-                                context_mgr[current_context_idx]->arguments.push_back(argv[arg_idx]);
+                                context_mgr_[current_context_idx_]->arguments.push_back(argv[arg_idx]);
                                 arity--;
                             }
                         }
 
                         if (arity > 0) {
-                            std::cout << "Expected " << context_mgr[current_context_idx]->action->arity
+                            std::cout << "Expected "
+                                      << context_mgr_[current_context_idx_]->action->arity
                                       << " parameters for action " << action << ". Only read "
-                                      << context_mgr[current_context_idx]->action->arity - arity
+                                      << context_mgr_[current_context_idx_]->action->arity - arity
                                       << "." << std::endl;
                             return PARSE_ERROR;
                         }
-                    } else if (arity < 0) { // if read parameters at least = arity
+                    } else if (arity < 0) {  // if read parameters at least = arity
                         // When arity is an "at least" representation we eat arguments
                         // until we either run out or until we hit a delimiter.
 
@@ -361,14 +435,15 @@ class HorseWhisperer {
                                     return parse_flag_outcome;
                                 }
                             }else {
-                                context_mgr[current_context_idx]->arguments.push_back(argv[arg_idx]);
+                                context_mgr_[current_context_idx_]->arguments.push_back(argv[arg_idx]);
                                 --abs_arity;
                             }
-                        } while ((arg_idx+1 < argc) && std::find(delimiters_.begin(), delimiters_.end(),
-                                                              argv[arg_idx+1]) == delimiters_.end());
+                        } while ((arg_idx+1 < argc)
+                                  && std::find(delimiters_.begin(), delimiters_.end(),
+                                               argv[arg_idx+1]) == delimiters_.end());
 
                         if (abs_arity > 0) {
-                            auto expected_arity = -context_mgr[current_context_idx]->action->arity;
+                            auto expected_arity = -context_mgr_[current_context_idx_]->action->arity;
                             std::cout << "Expected at least " << expected_arity
                                       << " parameters for action " << action << ". Only read "
                                       << expected_arity - abs_arity
@@ -392,8 +467,8 @@ class HorseWhisperer {
             return false;
         }
 
-        if (context_mgr.size() > 1) {
-            for (auto & context : context_mgr) {
+        if (context_mgr_.size() > 1) {
+            for (auto & context : context_mgr_) {
                 if (context->action && context->action->arguments_callback) {
                     if (!context->action->arguments_callback(context->arguments)) {
                         return false;
@@ -408,7 +483,7 @@ class HorseWhisperer {
     // Dynamically output help information based on registered global and action
     // specific flags
     void help() {
-        if (context_mgr[current_context_idx]->action) {
+        if (context_mgr_[current_context_idx_]->action) {
             actionHelp();
         } else {
             globalHelp();
@@ -425,32 +500,37 @@ class HorseWhisperer {
             return false;
         }
 
-        current_context_idx = GLOBAL_CONTEXT_IDX - 1;
+        current_context_idx_ = GLOBAL_CONTEXT_IDX - 1;
         bool previous_result = true;
 
-        if (context_mgr.size() > 1) {
-            for (size_t i = 0; i < context_mgr.size(); i++) {
-                current_context_idx++;
-                if (context_mgr[i]->action) {
+        if (context_mgr_.size() > 1) {
+            for (size_t i = 0; i < context_mgr_.size(); i++) {
+                current_context_idx_++;
+                if (context_mgr_[i]->action) {
                     if (!previous_result) {
-                        std::cout << "Not starting action '" << context_mgr[i]->action->name
-                                  << "'. Previous action failed to complete successfully." << std::endl;
+                        std::cout << "Not starting action '"
+                                  << context_mgr_[i]->action->name
+                                  << "'. Previous action failed to complete "
+                                  << "successfully." << std::endl;
                     } else {
-                        // Record the current_context_idx. calling parse inside an action_callback
-                        // allows the context list to grow during execution but has the side effect of
-                        // mutating the current_context_index.
-                        int tmp = current_context_idx;
+                        // Record the current_context_idx_. Calling parse inside
+                        // an action_callback allows the context list to grow
+                        // during execution but has the side effect of mutating
+                        // the current_context_index.
+                        int tmp = current_context_idx_;
                         // Flip it because success is 0
-                        previous_result = !context_mgr[i]->action->action_callback(context_mgr[i]->arguments);
-                        current_context_idx = tmp;
-                        if (!context_mgr[i]->action->chainable) {
+                        previous_result = !context_mgr_[i]->action->action_callback(
+                                                context_mgr_[i]->arguments);
+                        current_context_idx_ = tmp;
+                        if (!context_mgr_[i]->action->chainable) {
                             return !previous_result;
                         }
                     }
                 }
            }
         } else {
-            std::cout << "No action specified. See \"" << application_name_ << " --help\" for available actions." << std::endl;
+            std::cout << "No action specified. See \"" << application_name_
+                      << " --help\" for available actions." << std::endl;
         }
 
         return !previous_result;
@@ -465,11 +545,11 @@ class HorseWhisperer {
         flagp->description = description;
         flagp->flag_callback = flag_callback;
         // Aliases are space separated
-        std::istringstream iss(aliases);
+        std::istringstream iss { aliases };
         while (iss) {
             std::string tmp;
             iss >> tmp;
-            context_mgr[GLOBAL_CONTEXT_IDX]->flags[tmp] = flagp;
+            context_mgr_[GLOBAL_CONTEXT_IDX]->flags[tmp] = flagp;
         }
 
         // vlevel is special and we don't want it showing up in the help list
@@ -487,16 +567,18 @@ class HorseWhisperer {
         flagp->description = description;
         flagp->flag_callback = flag_callback;
         // Aliases are space separated
-        std::istringstream iss(aliases);
+        std::istringstream iss { aliases };
         std::string tmp;
         while (iss >> tmp) {
-            actions[action_name]->flags[tmp] = flagp;
+            actions_[action_name]->flags[tmp] = flagp;
         }
         registered_flags_[action_name].push_back(flagp);
     }
 
-    void defineAction(std::string name, int arity, bool chainable, std::string description, std::string help_string,
-                      ActionCallback action_callback, ArgumentsCallback arguments_callback) {
+    void defineAction(std::string name, int arity, bool chainable,
+                      std::string description, std::string help_string,
+                      ActionCallback action_callback,
+                      ArgumentsCallback arguments_callback) {
         Action* actionp = new Action();
         actionp->name = name;
         actionp->arity = arity;
@@ -505,27 +587,27 @@ class HorseWhisperer {
         actionp->action_callback = action_callback;
         actionp->arguments_callback = arguments_callback;
         actionp->chainable = chainable;
-        actions[name] = actionp;
+        actions_[name] = actionp;
     }
 
     template <typename Type>
     Type getFlagValue(std::string name) throw (undefined_flag_error) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
-            return static_cast<Flag<Type>*>(context_mgr[context_idx]->flags[name])->value;
+            return static_cast<Flag<Type>*>(context_mgr_[context_idx]->flags[name])->value;
         }
 
         throw undefined_flag_error { "undefined flag: " + name };
     };
 
-    FlagType getFlagType(const std::string& flag_name) {
+    FlagType checkAndGetTypeOfFlag(const std::string& flag_name) {
         int context_idx = getContextIdxIfDefined(flag_name);
 
         if (context_idx == NO_CONTEXT_IDX) {
             throw undefined_flag_error { "undefined flag: " + flag_name };
         }
 
-        return getFlagType(context_mgr[context_idx]->flags[flag_name]);
+        return getTypeOfFlag(context_mgr_[context_idx]->flags[flag_name]);
     }
 
     // ALSO check both contexts
@@ -534,7 +616,8 @@ class HorseWhisperer {
                                                       flag_validation_error) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
-            Flag<Type>* flagp = static_cast<Flag<Type>*>(context_mgr[context_idx]->flags[name]);
+            Flag<Type>* flagp = static_cast<Flag<Type>*>(
+                                    context_mgr_[context_idx]->flags[name]);
             if (flagp->flag_callback && !flagp->flag_callback(value)) {
                 throw flag_validation_error { "callback for flag '" + name +
                                               "' returned false" };
@@ -549,10 +632,10 @@ class HorseWhisperer {
     std::vector<std::string> getParsedActions() {
         std::vector<std::string> action_container {};
 
-        if (parsed_ && context_mgr.size() > 1) {
-            for (size_t i = 0; i < context_mgr.size(); i++) {
-                if (context_mgr[i]->action) {
-                    action_container.push_back(context_mgr[i]->action->name);
+        if (parsed_ && context_mgr_.size() > 1) {
+            for (size_t i = 0; i < context_mgr_.size(); i++) {
+                if (context_mgr_[i]->action) {
+                    action_container.push_back(context_mgr_[i]->action->name);
                 }
             }
         }
@@ -560,22 +643,81 @@ class HorseWhisperer {
         return action_container;
     }
 
-    void setHelpMargins(unsigned int left_margin, unsigned int right_margin) {description_margin_left = left_margin;
-        description_margin_right = right_margin;
+    void setHelpMargins(unsigned int left_margin, unsigned int right_margin) {description_margin_left_ = left_margin;
+        description_margin_right_ = right_margin;
+    }
+
+    // Debug method
+    void printState() {
+        std::stringstream ss {};
+        ss << "Current context index = " << std::to_string(current_context_idx_);
+        if (context_mgr_.size() > 1) {
+            for (size_t idx = 1; idx < context_mgr_.size(); idx++) {
+                ss << "\n" << context_mgr_[idx]->toString();
+            }
+        }
+        std::cout << ss.str() << "\n";
     }
 
   private:
-    int current_context_idx;
-    std::vector<ContextPtr> context_mgr;
-    std::map<std::string, Action*> actions;
+    // Index of the context currently being processed
+    int current_context_idx_;
+
+    // Container of contexts
+    std::vector<ContextPtr> context_mgr_;
+
+    // Registered flags
+    std::map<std::string, Action*> actions_;
+
+    // Maps contexts (global and single actions) to registered flags
     std::map<std::string, std::vector<FlagBase*>> registered_flags_;
-    bool parsed_ = false;
+
+    // Whether CL args have been parsed
+    bool parsed_;
+
+    // Action delimeters
     std::vector<std::string> delimiters_;
-    std::string application_name_ = "";
-    std::string help_banner_ = "";
-    std::string version_string_ = "";
-    unsigned int description_margin_left = DESCRIPTION_MARGIN_LEFT_DEFAULT;
-    unsigned int description_margin_right = DESCRIPTION_MARGIN_RIGHT_DEFAULT;
+
+    // Application name
+    std::string application_name_;
+
+    // Text header of the help message
+    std::string help_banner_;
+
+    // Version information
+    std::string version_string_;
+
+    // Margins, indicated as number of columns
+    unsigned int description_margin_left_;
+    unsigned int description_margin_right_;
+
+    void clean() {
+        context_mgr_.clear();
+        actions_.clear();
+        registered_flags_.clear();
+        delimiters_.clear();
+    }
+
+    void init() {
+        current_context_idx_ = GLOBAL_CONTEXT_IDX;
+
+        ContextPtr global_context { new Context() };
+        global_context->action = nullptr;
+        context_mgr_.push_back(std::move(global_context));
+
+        parsed_ = false;
+        application_name_ = "";
+        help_banner_ = "";
+        version_string_ = "";
+        description_margin_left_ = DESCRIPTION_MARGIN_LEFT_DEFAULT;
+        description_margin_right_ = DESCRIPTION_MARGIN_RIGHT_DEFAULT;
+
+        defineGlobalFlag<bool>("h help", "Show this message", false, nullptr);
+        defineGlobalFlag<int>("vlevel", "", 0, nullptr);
+        defineGlobalFlag<bool>("verbose", "Set verbose output", false,
+                               [this](bool) { setFlag<int>("vlevel", 1);
+                                              return true; });
+    }
 
     int parseFlag(char* argv[], int& i) {
         // It's a flag. Get the array offset
@@ -623,7 +765,7 @@ class HorseWhisperer {
 
         std::string value {};
 
-        FlagType flag_type = getFlagType(flagname);
+        FlagType flag_type = checkAndGetTypeOfFlag(flagname);
 
         if (k_v != std::string::npos) {
             value = &argv[i][k_v];
@@ -699,7 +841,7 @@ class HorseWhisperer {
         }
 
         std::cout << "\n\nActions:\n";
-        for (const auto& action : actions) {
+        for (const auto& action : actions_) {
             writeActionDescription(action.second);
         }
 
@@ -709,19 +851,22 @@ class HorseWhisperer {
 
     // Display help information for the current action context
     void actionHelp() {
-        if (context_mgr[current_context_idx]->action->help_string_.empty()) {
+        if (context_mgr_[current_context_idx_]->action->help_string_.empty()) {
             std::cout << "No specific help found for action :"
-                      << context_mgr[current_context_idx]->action->name
+                      << context_mgr_[current_context_idx_]->action->name
                       << "\n\n";
             return;
         }
 
-        std::cout << context_mgr[current_context_idx]->action->help_string_;
+        std::cout << context_mgr_[current_context_idx_]->action->help_string_;
 
-        if (registered_flags_.find(context_mgr[current_context_idx]->action->name) != registered_flags_.end()) {
-            std::cout << std::endl << "  " << context_mgr[current_context_idx]->action->name << " specific flags:" << std::endl;
-            for (const auto& flag : registered_flags_[context_mgr[current_context_idx]->action->name]) {
-                writeFlagHelp(flag);
+        if (registered_flags_.find(context_mgr_[current_context_idx_]->action->name)
+                != registered_flags_.end()) {
+            std::cout << "\n  " << context_mgr_[current_context_idx_]->action->name
+                      << " specific flags:\n";
+            for (const auto& f : registered_flags_[
+                                    context_mgr_[current_context_idx_]->action->name]) {
+                writeFlagHelp(f);
             }
         }
         std::cout << std::endl << std::endl;
@@ -735,7 +880,7 @@ class HorseWhisperer {
         std::string arg {};
         size_t last_alias_size { 0 };
 
-        switch (getFlagType(flag)) {
+        switch (getTypeOfFlag(flag)) {
             case FlagType::Bool:
                 // No argument
                 break;
@@ -752,7 +897,7 @@ class HorseWhisperer {
         while (aliases_stream >> alias) {
             if (alias != "") {
                 output << "\n";
-                output << std::setw(description_margin_left) << std::left;
+                output << std::setw(description_margin_left_) << std::left;
                 last_alias_size = alias.size() + arg.size();
 
                 if (last_alias_size == 1) {
@@ -771,14 +916,14 @@ class HorseWhisperer {
 
         // New line condition: (2 or 3 spaces + dash prefix + alias
         // size + 2 spaces to separate from description) > margin
-        if (last_alias_size + 6 > description_margin_left) {
-            newLine(description_margin_left);
+        if (last_alias_size + 6 > description_margin_left_) {
+            newLine(description_margin_left_);
         }
 
         bool first_line { true };
         for (auto& line : wordWrap(flag->description, getDescriptionWidth())) {
             if (!first_line) {
-                newLine(description_margin_left);
+                newLine(description_margin_left_);
             }
             output << line;
             first_line = false;
@@ -792,25 +937,25 @@ class HorseWhisperer {
         std::stringstream action_stream;
         action_stream << "  " << action->name;
 
-        std::cout << std::setw(description_margin_left) << std::left
+        std::cout << std::setw(description_margin_left_) << std::left
                   << action_stream.str();
 
         // New line condition: (2 spaces + action name + 2 spaces to
         // separate from description) > margin
-        if (action->name.size() + 4 > description_margin_left) {
+        if (action->name.size() + 4 > description_margin_left_) {
             std::cout << "\n";
-            std::cout << std::setw(description_margin_left) << std::left
+            std::cout << std::setw(description_margin_left_) << std::left
                       << "    ";
         }
 
-        std::cout << std::setw(description_margin_left) << std::left;
+        std::cout << std::setw(description_margin_left_) << std::left;
 
         bool first_line { true };
         for (auto& line : wordWrap(action->description, getDescriptionWidth())) {
             if (!first_line) {
-                std::cout << std::setw(description_margin_left) << std::left
+                std::cout << std::setw(description_margin_left_) << std::left
                           << "    "
-                          << std::setw(description_margin_left) << std::left;
+                          << std::setw(description_margin_left_) << std::left;
             }
             std::cout << line << "\n";
             first_line = false;
@@ -826,9 +971,11 @@ class HorseWhisperer {
     }
 
     int getContextIdxIfDefined(std::string name) {
-        if (context_mgr[current_context_idx]->flags.find(name) != context_mgr[current_context_idx]->flags.end()) {
-            return current_context_idx;
-        } else if (context_mgr[GLOBAL_CONTEXT_IDX]->flags.find(name) != context_mgr[GLOBAL_CONTEXT_IDX]->flags.end()) {
+        if (context_mgr_[current_context_idx_]->flags.find(name)
+                != context_mgr_[current_context_idx_]->flags.end()) {
+            return current_context_idx_;
+        } else if (context_mgr_[GLOBAL_CONTEXT_IDX]->flags.find(name)
+                != context_mgr_[GLOBAL_CONTEXT_IDX]->flags.end()) {
             return GLOBAL_CONTEXT_IDX;
         } else {
             return NO_CONTEXT_IDX;
@@ -836,31 +983,11 @@ class HorseWhisperer {
     }
 
     bool isActionDefined(std::string name) {
-        return !(actions.find(name) == actions.end());
-    }
-
-    FlagType getFlagType(const FlagBase* flagp) {
-        FlagType flag_type { FlagType::Bool };
-
-        // RTTI to determine the flag value type
-        if (dynamic_cast<const Flag<bool>*>(flagp)) {
-            flag_type = FlagType::Bool;
-        } else if (dynamic_cast<const Flag<std::string>*>(flagp)) {
-            flag_type = FlagType::String;
-        } else if (dynamic_cast<const Flag<int>*>(flagp)) {
-            flag_type = FlagType::Int;
-        } else if (dynamic_cast<const Flag<double>*>(flagp)) {
-            flag_type = FlagType::Double;
-        } else {
-            // We only support the types in the FlagType enum...
-            assert(false);
-        }
-
-        return flag_type;
+        return !(actions_.find(name) == actions_.end());
     }
 
     unsigned int getDescriptionWidth() {
-        return description_margin_right - description_margin_left;
+        return description_margin_right_ - description_margin_left_;
     }
 };
 
@@ -898,7 +1025,7 @@ static Type GetFlag(std::string flag_name) {
 }
 
 static FlagType GetFlagType(std::string flag_name) {
-    return HorseWhisperer::Instance().getFlagType(flag_name);
+    return HorseWhisperer::Instance().checkAndGetTypeOfFlag(flag_name);
 }
 
 template <typename Type>
