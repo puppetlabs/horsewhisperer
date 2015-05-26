@@ -13,9 +13,6 @@
 #include <functional>
 #include <memory>
 #include <stdexcept>
-
-// To disable assert()
-#define NDEBUG
 #include <cassert>
 
 
