@@ -2,6 +2,20 @@
 
 Change history for HorseWhisperer.
 
+# 0.9.0
+
+Released 2015-05-27
+
+* Fixed the way action flags are stored; previously, in case a given action
+was chained and an action flag was specified with different values, the last
+flag value would have been used in all action calls. This is now fixed; action
+flag values are confined in their action contexts.
+* FlagCallback and ArgumentsCallback are a void function type.
+* Now flag and action arguments validation callbacks are suppose to throw an
+exception in case of invalid arguments.
+* New ParseResult enum class.
+* The Parse() function now return ParseResult values.
+
 # 0.8.0
 
 Released 2015-05-12
