@@ -73,20 +73,30 @@ TEST_CASE("global SetFlag", "[global setflag]") {
     }
 
     SECTION("it does not throws when flag validation succeeds") {
-        HorseWhisperer::DefineGlobalFlag<bool>("global-success",
-                                               "a test flag",
-                                               false,
-                                               [](bool) -> bool { return true; });
+        HW::DefineGlobalFlag<bool>("global-success",
+                                   "a test flag",
+                                   false,
+                                   [](bool) {});
         REQUIRE_NOTHROW(HW::SetFlag<bool>("global-success", false));
     }
 
     SECTION("it throws when flag validation fails") {
-        HorseWhisperer::DefineGlobalFlag<bool>("global-failure",
-                                               "a test flag",
-                                               false,
-                                               [](bool) -> bool { return false; });
+        HW::FlagCallback<bool> v_c;
+
+        SECTION("flag_validation_error is thrown") {
+            v_c = [](bool) { throw HW::flag_validation_error { "error!" }; };
+        }
+
+        SECTION("runtime_error is thrown") {
+            v_c = [](bool) { throw std::runtime_error { "error!" }; };
+        }
+
+        HW::DefineGlobalFlag<bool>("global-failure",
+                                   "a test flag",
+                                   false,
+                                   v_c);
         REQUIRE_THROWS_AS(HW::SetFlag<bool>("global-failure", false),
-                         HW::flag_validation_error);
+                          HW::flag_validation_error);
     }
 }
 
@@ -123,18 +133,29 @@ TEST_CASE("GetFlagType", "[type]") {
     }
 
     SECTION("it does not throws when flag validation succeeds") {
-        HorseWhisperer::DefineGlobalFlag<bool>("global-success",
-                                               "a test flag",
-                                               false,
-                                               [](bool) -> bool { return true; });
+        HW::DefineGlobalFlag<bool>("global-success",
+                                   "a test flag",
+                                   false,
+                                   [](bool) {});
         REQUIRE_NOTHROW(HW::SetFlag<bool>("global-success", false));
     }
 
     SECTION("it throws when flag validation fails") {
-        HorseWhisperer::DefineGlobalFlag<bool>("global-failure",
-                                               "a test flag",
-                                               false,
-                                               [](bool) -> bool { return false; });
+        HW::FlagCallback<bool> v_c;
+
+        SECTION("flag_validation_error is thrown") {
+            v_c = [](bool) { throw HW::flag_validation_error { "error!" }; };
+        }
+
+        SECTION("runtime_error is thrown") {
+            v_c = [](bool) { throw std::runtime_error { "error!" }; };
+        }
+
+        HW::DefineGlobalFlag<bool>("global-failure",
+                                   "a test flag",
+                                   false,
+                                   v_c);
+
         REQUIRE_THROWS_AS(HW::SetFlag<bool>("global-failure", false),
                          HW::flag_validation_error);
     }
@@ -193,67 +214,67 @@ TEST_CASE("parse", "[parse]") {
     prepareGlobal();
     prepareAction(nullptr);
 
-    SECTION("returns PARSE_OK on success") {
+    SECTION("returns ParseResult::OK on success") {
         const char* args[] = { "test-app", "test-action"};
-        REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::PARSE_OK);
+        REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::ParseResult::OK);
     }
 
-    SECTION("returns PARSE_HELP on the help flag") {
+    SECTION("returns ParseResult::HELP on the help flag") {
         const char* args[] = { "test-app", "test-action", "--help"};
-        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::PARSE_HELP);
+        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::HELP);
     }
 
-    SECTION("returns PARSE_VERSION on the --version flag") {
+    SECTION("returns ParseResult::VERSION on the --version flag") {
         const char* args[] = { "test-app", "test-action", "--version"};
-        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::PARSE_VERSION);
+        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::VERSION);
     }
 
     SECTION("returns PARSE_EERROR on bad arguments") {
         const char* args[] = { "test-app", "test-action", "test-smachtions"};
-        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::PARSE_ERROR);
+        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::ERROR);
     }
 
-    SECTION("returns PARSE_INVALID_FLAG on a bad flag") {
+    SECTION("returns ParseResult::INVALID_FLAG on a bad flag") {
         const char* args[] = { "test-app", "test-action", "--global-bad-flag", "foo" };
-        REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::PARSE_INVALID_FLAG);
+        REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::INVALID_FLAG);
     }
 
-    SECTION("returns PARSE_OK when mixing key=value and other flags") {
+    SECTION("returns ParseResult::OK when mixing key=value and other flags") {
         HW::DefineGlobalFlag<int>("foo", "a int test flag", 0, nullptr);
         HW::DefineGlobalFlag<bool>("bar", "a bool test flag", false, nullptr);
 
         const char* args[] = { "test-app", "test-action", "--bar", "--foo=5" };
-        REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::PARSE_OK);
+        REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
     }
 
-    SECTION("returns PARSE_OK when flag is given as key=value") {
+    SECTION("returns ParseResult::OK when flag is given as key=value") {
         HW::DefineGlobalFlag<int>("foo", "a test flag", 0, nullptr);
         const char* args[] = { "test-app", "test-action", "--foo=5" };
-        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::PARSE_OK);
+        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
     }
 
     HW::DefineAction("new_action", 2, false, "test action", "2 args required!",
                      testActionCallback);
 
-    SECTION("returns PARSE_ERROR if two action arguments are missing") {
+    SECTION("returns ParseResult::ERROR if two action arguments are missing") {
         const char* args[] = { "test-app", "new_action" };
-        REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::PARSE_ERROR);
+        REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::ParseResult::ERROR);
     }
 
-    SECTION("return PARSE_ERROR if one action argument is missing") {
+    SECTION("return ParseResult::ERROR if one action argument is missing") {
         const char* args[] = { "test-app", "new_action", "spam" };
-        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::PARSE_ERROR);
+        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::ERROR);
     }
 
-    SECTION("returns PARSE_ERROR if one action arguments is missing and a "
+    SECTION("returns ParseResult::ERROR if one action arguments is missing and a "
             "flag is passed") {
         const char* args[] = { "test-app", "new_action", "spam", "--verbose" };
-        REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::PARSE_ERROR);
+        REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::ERROR);
     }
 
-    SECTION("returns PARSE_OK if all action arguments are provided") {
+    SECTION("returns ParseResult::OK if all action arguments are provided") {
         const char* args[] = { "test-app", "new_action", "spam", "eggs" };
-        REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::PARSE_OK);
+        REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
     }
 }
 
