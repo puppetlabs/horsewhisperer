@@ -70,7 +70,7 @@ At any point after declaring a flag it's value can be set or looked up by the fo
     template <typename FlagType>
     bool SetFlag(std::string flag_name, FlagType value)
 
-HorseWhisperer will throw a "horsewhisperer_error" exception when trying to apply GetFlag or
+HorseWhisperer will throw an "undefined_flag_error" exception when trying to apply GetFlag or
 SetFlag to an undefined flag.
 
 The vlevel value can be accessed by calling GetFlag:
@@ -118,7 +118,7 @@ Global context flags can be defined with the `DefineGlobalFlag` templated functi
     void DefineGlobalFlag(std::string aliases,
                           std::string description,
                           FlagType default_value,
-                          std::function<bool(FlagType)> flag_callback)
+                          std::function<void(FlagType)> flag_callback)
 
 **aliases:** Combination of short and long names, space separated, which can be used to set and look up the flag.
 
@@ -127,17 +127,14 @@ Global context flags can be defined with the `DefineGlobalFlag` templated functi
 **default_value:** Default value of the flag which is set.
 
 **flag_callback:** This is the flag validation callback and it will be called when the flag is set. This can be any function
-you provide and it doesn't necessarily have to be used for validation. Be aware that the function will be expected
-to return a boolean value. If false is returned the flag's value will not be changed.
+you provide and it doesn't necessarily have to be used for validation. Be aware that `flag_validation_error` exceptions will be propagated whereas all other exceptions will be converted to such class.
 
     // validation function
     bool validate(int x) {
         // Max value we accept is 5
         if (x > 5) {
-          std::cout << "You have assigned too many ponies!" << std::endl;
-          return false;
+            throw flag_validation_error { "You have assigned too many ponies!" };
         }
-        return true;
     }
 
     ...
@@ -164,7 +161,7 @@ can be long so it is worth looking at it in detail.
                              std::string description,
                              std::string help_string,
                              std::function<int(const std::vector<std::string>& args)> action_callback,
-                             std::function<bool(const std::vector<std::string>& args)> arguments_callback = nullptr)
+                             std::function<void(const std::vector<std::string>& args)> arguments_callback = nullptr)
 
 **action_name:** The name of the action. This name will always be used to refer to the action during the life of your
 application.
@@ -191,21 +188,16 @@ which will contain the arguments passed to the action.
         return 0;
     }
 
-**arguments_callback (optional):** This optional callback will be executed when we invoke the
-HorseWhisperer::ValidateActionArguments() function. Here you can process the arguments of a given
-action and validate them. The arguments are passed as a vector of strings, as for the above
-action_callback. This callback must return a boolean value, that should indicate the outcome of the
-arguments validation.
+**arguments_callback (optional):** This optional callback will be executed by the HorseWhisperer::Parse() function, once the parsing operation is completed. Here you can process the arguments of a given action and validate them. The arguments are passed as a vector of strings, as for the above
+action_callback. As for the flag validation callback, `action_validation_error` exceptions will be propagated; all other exceptions will be converted to such class.
 
     // trot arguments callback
-    bool trotArgumentsCallback(const std::vector<std::string>& arguments) {
+    void trotArgumentsCallback(const std::vector<std::string>& arguments) {
         for (std::string arg : arguments) {
             if (arg.find("mode", 0) == std::string::npos) {
-                std::cout << "Error: invalid trot argument " << arg << ".\n";
-                return false;
+                throw action_validation_error { "unknown trot mode '" + arg + "'" };
             }
         }
-        return true;
     }
 
 
@@ -326,30 +318,22 @@ they should be called in as well as the flags used only by them.
     // int Parse(int argc, char** argv)
     Parse(argc, argv); // The same argv and argc passed to main()
 
-The HorseWhisperer::Parse function will return an integer indicating the operation outcome.
-The possible return values are listed below, together with the related macro.
+The HorseWhisperer::Parse function will return a value from the HorseWhisperer::ParseResult enum,  indicating the operation outcome.
+The possible return values are listed below.
 
-    PARSE_OK = 0;             // success
-    PARSE_HELP = -1;          // help request
-    PARSE_VERSION = -2;       // version request
-    PARSE_ERROR = 1;          // failed to parse (e.g. missing argument)
-    PARSE_INVALID_FLAG = 2;   // invalid flag (e.g. string instead of an integer)
+    ParseResult::OK;            // success
+    ParseResult::HELP;          // help request
+    ParseResult::VERSION;       // version request
+    ParseResult::ERROR;         // failed to parse (e.g. missing argument)
+    ParseResult::INVALID_FLAG;  // invalid flag (e.g. string instead of an integer)
+
+When parsing a given flag value, the releavant flag validation callback will be executed and a `flag_validation_error` may be thrown.
+Once the parsing operation is complete, the action validation callbacks will be executed to validate the action argumetns; an `action_validation_error` may be thrown.
 
 ### Displaying the help message
 
 If the HorseWhisperer::Parse function returns a PARSE_HELP value, you can simply call
 HorseWhisperer::ShowHelp to display the requested help message (global or action-specific).
-
-### Validating action arguments
-
-When the commandline is parsed, you can trigger the execution of the optional action argument callbacks
-by calling HorseWhisperer::ValidateActionArguments(). In case any of of the callbacks return false,
-this function stops executing and returns false. It returns true otherwise.
-Also note that the validate function will always return false if HorseWhisperer::Parse did not
-return PARSE_OK previously.
-
-    // bool ValidateActionArguments()
-    ValidateActionArguments();
 
 ### Executing actions
 
@@ -359,4 +343,3 @@ immediately return 1, without executing any action callback.
 
     // int Start();
     return Start();
-

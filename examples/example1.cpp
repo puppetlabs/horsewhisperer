@@ -25,13 +25,12 @@
 
 using namespace HorseWhisperer;
 
-bool validation(int x) {
+// flag validation callback
+void validation(int x) {
     // Max value we accept is 5
     if (x > 5) {
-        std::cout << "You have assigned too many ponies!" << std::endl;
-        return false;
+        throw flag_validation_error { "You have assigned too many ponies!" };
     }
-    return true;
 }
 
 // help messages
@@ -50,36 +49,21 @@ int gallop(const Arguments& arguments) {
     return 0;
 }
 
-// trot: internal function to process arguments
-bool processTrotArguments_(const std::vector<std::string>& cl_arguments,
-                           std::vector<std::string>& processed_arguments){
-    for (std::string arg : cl_arguments) {
+// trot: arguments validation callback
+void trotArgumentsCallback(const std::vector<std::string>& arguments) {
+    for (const auto& arg : arguments) {
         if (arg.find("mode", 0) == std::string::npos) {
-            std::cout << "Error: invalid trot argument " << arg << ".\n";
-            return false;
-        } else {
-            processed_arguments.push_back(arg.substr(5));
+            throw action_validation_error { "unknown trot mode '" + arg + "'" };
         }
     }
-    return true;
-}
-
-// trot: arguments callback
-bool trotArgumentsCallback(const std::vector<std::string>& arguments) {
-    std::vector<std::string> processed_args {};
-    return processTrotArguments_(arguments, processed_args);
 }
 
 // trot: action callback
 int trot(const std::vector<std::string>& arguments) {
-    std::vector<std::string> processed_args {};
-    if (processTrotArguments_(arguments, processed_args)) {
-        for (std::string mode : processed_args) {
-            std::cout << "Trotting like a " << mode << std::endl;
-        }
-        return 0;
+    for (const auto& mode : arguments) {
+        std::cout << "Trotting like a " << mode << std::endl;
     }
-    return 1;
+    return 0;
 }
 
 int main(int argc, char* argv[]) {
@@ -101,27 +85,25 @@ int main(int argc, char* argv[]) {
                  trot, trotArgumentsCallback);
 
     // Parse command line: global flags, action arguments, and action flags
-    switch (Parse(argc, argv)) {
-        case PARSE_OK:
-            break;
-        case PARSE_HELP:
-            ShowHelp();
-            return 0;
-        case PARSE_VERSION:
-            ShowVersion();
-            return 0;
-        case PARSE_ERROR:
-            std::cout << "Failed to parse the command line input.\n";
-            return 1;
-        case PARSE_INVALID_FLAG:
-            std::cout << "Invalid flag.\n";
-            return 2;
-    }
-
-    // Process and validate action arguments
-    if (!ValidateActionArguments()) {
-        std::cout << "Failed to validate the action arguments.\n";
-        return 1;
+    try {
+        switch (Parse(argc, argv)) {
+            case ParseResult::OK:
+                break;
+            case ParseResult::HELP:
+                ShowHelp();
+                return 0;
+            case ParseResult::VERSION:
+                ShowVersion();
+                return 0;
+            case ParseResult::ERROR:
+                std::cout << "Failed to parse the command line input.\n";
+                return 1;
+            case ParseResult::INVALID_FLAG:
+                std::cout << "Invalid flag.\n";
+                return 2;
+        }
+    } catch (horsewhisperer_error& e) {
+        std::cout << e.what() << "\n";
     }
 
     // Start execution

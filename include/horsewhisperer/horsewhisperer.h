@@ -40,6 +40,12 @@ class flag_validation_error : public horsewhisperer_error {
             horsewhisperer_error(msg) {}
 };
 
+class action_validation_error : public horsewhisperer_error {
+  public:
+    explicit action_validation_error(std::string const& msg) :
+            horsewhisperer_error(msg) {}
+};
+
 //
 // Tokens
 //
@@ -51,11 +57,7 @@ static const int GLOBAL_CONTEXT_IDX = 0;
 static const int NO_CONTEXT_IDX = -1;
 
 // Parse results
-static const int PARSE_OK = 0;
-static const int PARSE_HELP = -1;
-static const int PARSE_VERSION = -2;
-static const int PARSE_ERROR = 1;
-static const int PARSE_INVALID_FLAG = 2;
+enum class ParseResult { OK, HELP, VERSION, ERROR, INVALID_FLAG };
 
 // Margins for help descriptions
 static const unsigned int DESCRIPTION_MARGIN_LEFT_DEFAULT = 30;
@@ -67,12 +69,24 @@ static const unsigned int DESCRIPTION_MARGIN_RIGHT_DEFAULT = 80;
 
 enum FlagType { Bool, Int, Double, String };
 
+// Callback specified for a given value; called whenever the setFlag()
+// function is executed in order to validate the flag argument - it
+// will be called when parsing.
+// The callback should throw an error in case an invalid value is
+// assigned to the flag; in case the error is a flag_validation_error,
+// it will be propagated.
 template <typename Type>
-using FlagCallback = std::function<bool(Type&)>;
+using FlagCallback = std::function<void(Type&)>;
 
 using Arguments = std::vector<std::string>;
 
-using ArgumentsCallback = std::function<bool(const Arguments& arguments)>;
+// Callback specified for a given action; called by the parse()
+// function after completing the parsing, in order to validate its
+// arguments.
+// The callback should throw an error in case an invalid value is
+// assigned to the flag; in case the error is an
+// action_validation_error, it will be propagated.
+using ArgumentsCallback = std::function<void(const Arguments& arguments)>;
 
 using ActionCallback = std::function<int(const Arguments& arguments)>;
 
@@ -190,8 +204,7 @@ static void SetAppName(std::string name) __attribute__ ((unused));
 static void SetHelpBanner(std::string banner) __attribute__ ((unused));
 static void SetVersion(std::string version) __attribute__ ((unused));
 static void SetDelimiters(std::vector<std::string> delimiters) __attribute__ ((unused));
-static int Parse(int argc, char** argv) __attribute__ ((unused));
-static bool ValidateActionArguments() __attribute__ ((unused));
+static ParseResult Parse(int argc, char** argv) __attribute__ ((unused));
 static void ShowHelp() __attribute__ ((unused));
 static void ShowVersion() __attribute__ ((unused));
 static std::vector<std::string> GetParsedActions() __attribute__ ((unused));
@@ -329,12 +342,12 @@ class HorseWhisperer {
         return false;
     }
 
-    int parse(int argc, char* argv[]) {
+    ParseResult parse(int argc, char* argv[]) {
         for (int arg_idx = 1; arg_idx < argc; arg_idx++) {
             // Identify if it's a flag
             if (argv[arg_idx][0] == '-') {
-                int parse_flag_outcome { parseFlag(argv, arg_idx ) };
-                if (parse_flag_outcome != PARSE_OK) {
+                auto parse_flag_outcome = parseFlag(argv, arg_idx );
+                if (parse_flag_outcome != ParseResult::OK) {
                     return parse_flag_outcome;
                 }
             } else if (isDelimiter(argv[arg_idx])) {  // skip over delimiter
@@ -386,19 +399,19 @@ class HorseWhisperer {
                             if (arg_idx >= argc) {  // have we run out of tokens?
                                 break;
                             } else if (argv[arg_idx][0] == '-') {  // is it a flag token?
-                                int parse_flag_outcome { parseFlag(argv, arg_idx ) };
-                                if (parse_flag_outcome != PARSE_OK) {
+                                auto parse_flag_outcome = parseFlag(argv, arg_idx);
+                                if (parse_flag_outcome != ParseResult::OK) {
                                     return parse_flag_outcome;
                                 }
                             } else if (isActionDefined(argv[arg_idx])) {  // is it an action?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found action: " << argv[arg_idx] << std::endl;
-                                return PARSE_ERROR;
+                                return ParseResult::ERROR;
                             } else if (std::find(delimiters_.begin(), delimiters_.end(),
                                                  argv[arg_idx]) != delimiters_.end()) {  // is it a delimiter?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found delimiter: " << argv[arg_idx] << std::endl;
-                                return PARSE_ERROR;
+                                return ParseResult::ERROR;
                             } else {
                                 context_mgr_[current_context_idx_]->arguments.push_back(argv[arg_idx]);
                                 arity--;
@@ -411,7 +424,7 @@ class HorseWhisperer {
                                       << " parameters for action " << action << ". Only read "
                                       << context_mgr_[current_context_idx_]->action->arity - arity
                                       << "." << std::endl;
-                            return PARSE_ERROR;
+                            return ParseResult::ERROR;
                         }
                     } else if (arity < 0) {  // if read parameters at least = arity
                         // When arity is an "at least" representation we eat arguments
@@ -419,7 +432,7 @@ class HorseWhisperer {
 
                         if (arg_idx >= argc - 1) {
                             std::cout << "No arguments specified for " << action << ".\n";
-                            return PARSE_ERROR;
+                            return ParseResult::ERROR;
                         }
 
                         int abs_arity { -arity };
@@ -427,8 +440,8 @@ class HorseWhisperer {
                         do {
                             ++arg_idx;
                             if (argv[arg_idx][0] == '-') {
-                                int parse_flag_outcome { parseFlag(argv, arg_idx ) };
-                                if (parse_flag_outcome != PARSE_OK) {
+                                auto parse_flag_outcome = parseFlag(argv, arg_idx);
+                                if (parse_flag_outcome != ParseResult::OK) {
                                     return parse_flag_outcome;
                                 }
                             }else {
@@ -445,36 +458,38 @@ class HorseWhisperer {
                                       << " parameters for action " << action << ". Only read "
                                       << expected_arity - abs_arity
                                       << "." << std::endl;
-                            return PARSE_ERROR;
+                            return ParseResult::ERROR;
                         }
                     }
                 } else {
                     std::cout << "Unknown action: " << argv[arg_idx] << std::endl;
-                    return PARSE_ERROR;
+                    return ParseResult::ERROR;
                 }
             }
         }
 
+        validateActionArguments();
+
         parsed_ = true;
-        return PARSE_OK;
+        return ParseResult::OK;
     }
 
-    bool validateActionArguments() {
-        if (!parsed_) {
-            return false;
-        }
-
+    void validateActionArguments() {
         if (context_mgr_.size() > 1) {
             for (auto & context : context_mgr_) {
                 if (context->action && context->action->arguments_callback) {
-                    if (!context->action->arguments_callback(context->arguments)) {
-                        return false;
+                    try {
+                        context->action->arguments_callback(context->arguments);
+                    } catch (action_validation_error) {
+                        throw;
+                    } catch (std::exception& e) {
+                        throw action_validation_error { "failed to validate "
+                                                        + context->action->name
+                                                        + " argument - " + e.what() };
                     }
                 }
             }
         }
-
-        return true;
     }
 
     // Dynamically output help information based on registered global and action
@@ -615,10 +630,18 @@ class HorseWhisperer {
         if (context_idx != NO_CONTEXT_IDX) {
             Flag<Type>* flagp = static_cast<Flag<Type>*>(
                                     context_mgr_[context_idx]->flags[name]);
-            if (flagp->flag_callback && !flagp->flag_callback(value)) {
-                throw flag_validation_error { "callback for flag '" + name +
-                                              "' returned false" };
+
+            if (flagp->flag_callback) {
+                try {
+                    flagp->flag_callback(value);
+                } catch (flag_validation_error) {
+                    throw;
+                } catch (std::exception& e) {
+                    throw flag_validation_error { "failed to validate '" + name
+                                                  + "' flag: " + e.what() };
+                }
             }
+
             flagp->value = value;
             return;
         }
@@ -712,11 +735,10 @@ class HorseWhisperer {
         defineGlobalFlag<bool>("h help", "Show this message", false, nullptr);
         defineGlobalFlag<int>("vlevel", "", 0, nullptr);
         defineGlobalFlag<bool>("verbose", "Set verbose output", false,
-                               [this](bool) { setFlag<int>("vlevel", 1);
-                                              return true; });
+                               [this](bool) { setFlag<int>("vlevel", 1); });
     }
 
-    int parseFlag(char* argv[], int& i) {
+    ParseResult parseFlag(char* argv[], int& i) {
         // It's a flag. Get the array offset
         int offset = 1;
         if (argv[i][1] == '-') {
@@ -741,23 +763,23 @@ class HorseWhisperer {
             if (vlevel == flagname.size()) {
                 setFlag<bool>("verbose", true);
                 setFlag<int>("vlevel", vlevel);
-                return PARSE_OK;
+                return ParseResult::OK;
             }
         }
 
         // Deal with the special help flag
         if (flagname == "help" || flagname == "h") {
-            return PARSE_HELP;
+            return ParseResult::HELP;
         }
 
         // Deal with the special --version flag
         if (flagname == "version") {
-            return PARSE_VERSION;
+            return ParseResult::VERSION;
         }
 
         if (!isFlagDefined(flagname)) {
             std::cout << "Unknown flag: " << flagname << std::endl;
-            return PARSE_ERROR;
+            return ParseResult::ERROR;
         }
 
         std::string value {};
@@ -774,8 +796,8 @@ class HorseWhisperer {
         return setAndValidateFlag(flag_type, flagname, value);
     }
 
-    int setAndValidateFlag(FlagType flag_type, std::string flagname,
-                           std::string value) {
+    ParseResult setAndValidateFlag(FlagType flag_type, std::string flagname,
+                                   std::string value) {
         if (flag_type == FlagType::Bool) {
             bool b_val { true };
 
@@ -787,43 +809,43 @@ class HorseWhisperer {
                     std::cout << "Flag '" << flagname
                               << "' expects a value of 'true' or 'false'"
                               << std::endl;
-                    return PARSE_ERROR;
+                    return ParseResult::ERROR;
                 }
             }
             setFlag<bool>(flagname, b_val);
-            return PARSE_OK;
+            return ParseResult::OK;
         } else {
             if (value.empty()) {
                 std::cout << "Missing value for flag: " << flagname << std::endl;
-                return PARSE_ERROR;
+                return ParseResult::ERROR;
             }
 
             if (flag_type == FlagType::String) {
                 setFlag<std::string>(flagname, std::string(value));
-                return PARSE_OK;
+                return ParseResult::OK;
             } else if (flag_type == FlagType::Int) {
                 if (validateInteger(value)) {
                     setFlag<int>(flagname, std::stol(value, nullptr, 10));
-                    return PARSE_OK;
+                    return ParseResult::OK;
                 } else {
                     std::cout << "Flag '" << flagname
                                 << "' expects a value of type integer" << std::endl;
-                    return PARSE_INVALID_FLAG;
+                    return ParseResult::INVALID_FLAG;
                 }
             } else if (flag_type == FlagType::Double) {
                 if (validateDouble(value)) {
                     setFlag<double>(flagname, std::stod(value));
-                    return PARSE_OK;
+                    return ParseResult::OK;
                 } else {
                     std::cout << "Flag '" << flagname
                               << "' expects a value of type double" << std::endl;
-                    return PARSE_INVALID_FLAG;
+                    return ParseResult::INVALID_FLAG;
                 }
             }
         }
 
         std::cout << flagname << " is not of a valid flag type." << std::endl;
-        return PARSE_ERROR;
+        return ParseResult::ERROR;
     }
 
     // Display help information for the global context
@@ -1066,14 +1088,13 @@ static void SetDelimiters(std::vector<std::string> delimiters) {
     HorseWhisperer::Instance().setDelimiters(delimiters);
 }
 
-// Return 1 if parse didn't succeed.
-static int Parse(int argc, char** argv) {
+// Return the parsing outcome as a ParseResult enum value.
+// Throw an action_validation_error in case any action validation
+// callback invalidates or fails to validate an argument.
+// Throw a flag_validation_error in case any flag validation
+// callback invalidates or fails to validate a flag value.
+static ParseResult Parse(int argc, char** argv) {
     return HorseWhisperer::Instance().parse(argc, argv);
-}
-
-// Return false if parse didn't succeed.
-static bool ValidateActionArguments() {
-    return HorseWhisperer::Instance().validateActionArguments();
 }
 
 static void ShowHelp() {
