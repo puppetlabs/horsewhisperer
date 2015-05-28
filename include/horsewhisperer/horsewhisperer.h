@@ -389,7 +389,8 @@ class HorseWhisperer {
                     context_mgr_.push_back(std::move(action_context));
                     current_context_idx_++;
 
-                    assert(current_context_idx_ == context_mgr_.size() - 1);
+                    assert(static_cast<unsigned int>(current_context_idx_)
+                           == context_mgr_.size() - 1);
 
                     // parse arguments and action flags
                     int arity = context_mgr_[current_context_idx_]->action->arity;
