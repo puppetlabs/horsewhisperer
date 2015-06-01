@@ -11,14 +11,13 @@ actions and context sensitive command line arguments are desired.)
 
 ## How do I even?
 
-Using The Horse Whisperer comes down to 7 steps
+Using The Horse Whisperer comes down to 6 steps
 
  * Optionally configuring the global context
  * Defining global flags
  * Defining a set of actions
  * Defining action specific flags
- * Parsing the commandline (global flags, actions, action flags, and arguments)
- * Validating action arguments
+ * Parsing and validating the commandline (global flags, actions, action flags, and arguments)
  * Executing actions
 
 ### Before we begin
@@ -315,7 +314,7 @@ When all flags and actions have been defined we are ready to parse the commandli
 a chain of contexts. The contexts contain the global flags, a list of actions and the order
 they should be called in as well as the flags used only by them.
 
-    // int Parse(int argc, char** argv)
+    // ParseResult Parse(int argc, char** argv)
     Parse(argc, argv); // The same argv and argc passed to main()
 
 The HorseWhisperer::Parse function will return a value from the HorseWhisperer::ParseResult enum,  indicating the operation outcome.
@@ -332,13 +331,13 @@ Once the parsing operation is complete, the action validation callbacks will be 
 
 ### Displaying the help message
 
-If the HorseWhisperer::Parse function returns a PARSE_HELP value, you can simply call
+If the HorseWhisperer::Parse function returns ParseResult::HELP, you can simply call
 HorseWhisperer::ShowHelp to display the requested help message (global or action-specific).
 
 ### Executing actions
 
 When the commandline has been parsed starting your chain of action is as simple as calling the Start() function. Actions will continue to be executed until either the end of the list is reached or an action fails. When finished it will return the result of all the executed actions and'ed together (a return value of 0 means everything succeeded, 1 means the last attempt at executing an action failed).
-In case a previous HorseWhisperer::Parse call did not return PARSE_OK, the start function will
+In case a previous HorseWhisperer::Parse call did not return ParseResult::OK, the start function will
 immediately return 1, without executing any action callback.
 
     // int Start();
