@@ -2,6 +2,13 @@
 
 Change history for HorseWhisperer.
 
+# 0.9.1
+
+Released 2015-06-29
+
+* Fixed bug where parsing action flags from the cli would not set all the action
+aliases.
+
 # 0.9.0
 
 Released 2015-05-27
