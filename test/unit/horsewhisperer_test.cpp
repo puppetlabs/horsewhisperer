@@ -159,6 +159,13 @@ TEST_CASE("GetFlagType", "[type]") {
         REQUIRE_THROWS_AS(HW::SetFlag<bool>("global-failure", false),
                          HW::flag_validation_error);
     }
+
+    SECTION("it can get the value for all flag aliasses") {
+        HW::DefineGlobalFlag<bool>("a alias", "aliased flag", false, nullptr);
+        HW::SetFlag<bool>("a", true);
+        REQUIRE(HW::GetFlag<bool>("a") == true);
+        REQUIRE(HW::GetFlag<bool>("alias") == true);
+    }
 }
 
 int getTest(std::vector<std::string>) {
@@ -275,6 +282,22 @@ TEST_CASE("parse", "[parse]") {
     SECTION("returns ParseResult::OK if all action arguments are provided") {
         const char* args[] = { "test-app", "new_action", "spam", "eggs" };
         REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
+    }
+
+    SECTION("it parses and sets aliased flags") {
+        HW::DefineGlobalFlag<bool>("a alias", "aliased flag", false, nullptr);
+        const char* args[] = { "test-app", "test-action", "-a"};
+        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
+        REQUIRE(HW::GetFlag<bool>("a") == true);
+        REQUIRE(HW::GetFlag<bool>("alias") == true);
+    }
+
+    SECTION("it parses and sets aliased action flagsflags") {
+        HW::DefineActionFlag<bool>("test-action", "a alias", "aliased flag", false, nullptr);
+        const char* args[] = { "test-app", "test-action", "-a"};
+        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
+        REQUIRE(HW::GetFlag<bool>("a") == true);
+        REQUIRE(HW::GetFlag<bool>("alias") == true);
     }
 }
 
