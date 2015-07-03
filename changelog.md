@@ -2,6 +2,14 @@
 
 Change history for HorseWhisperer.
 
+# 0.9.2
+
+Released 2015-07-03
+
+* The HorseWhisperer::Start() function will now print an error message on stdout
+in case an action is registered without defining a callback, instead of
+throwing an exception. In that case, possible chained actions will be ignored.
+
 # 0.9.1
 
 Released 2015-06-29
