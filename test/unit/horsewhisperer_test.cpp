@@ -353,6 +353,12 @@ TEST_CASE("HorseWhisperer::Start", "[start]") {
     HW::Reset();
     prepareGlobal();
 
+    SECTION("returns false in case of missing action callback") {
+        HW::DefineAction("start_test_1", 0, false, "test-action", "no help",
+                         nullptr);
+        REQUIRE(!HW::Start());
+    }
+
     SECTION("it executes an action") {
         int modify_me = 0;
         HW::DefineAction("start_test_1", 0, false, "test-action", "no help",
