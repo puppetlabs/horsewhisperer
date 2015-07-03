@@ -531,30 +531,43 @@ class HorseWhisperer {
         }
 
         current_context_idx_ = GLOBAL_CONTEXT_IDX - 1;
-        bool previous_result = true;
+        bool previous_success = true;
 
         if (context_mgr_.size() > 1) {
             for (size_t i = 0; i < context_mgr_.size(); i++) {
                 current_context_idx_++;
                 if (context_mgr_[i]->action) {
-                    if (!previous_result) {
+                    auto& current_action = context_mgr_[i]->action;
+                    if (!previous_success) {
                         std::cout << "Not starting action '"
-                                  << context_mgr_[i]->action->name
+                                  << current_action->name
                                   << "'. Previous action failed to complete "
                                   << "successfully." << std::endl;
+                    } else if (!current_action->action_callback) {
+                        std::cout << "No calback has been defined for action '"
+                                  << current_action->name << "'." << std::endl;
+                        previous_success = false;
                     } else {
                         // Record the current_context_idx_. Calling parse inside
                         // an action_callback allows the context list to grow
                         // during execution but has the side effect of mutating
                         // the current_context_index.
                         int tmp = current_context_idx_;
+
                         // Flip it because success is 0
-                        previous_result = !context_mgr_[i]->action->action_callback(
+                        previous_success = !current_action->action_callback(
                                                 context_mgr_[i]->arguments);
                         current_context_idx_ = tmp;
-                        if (!context_mgr_[i]->action->chainable) {
-                            return !previous_result;
+                    }
+
+                    if (!current_action->chainable) {
+                        if (i < context_mgr_.size() - 1
+                            && context_mgr_[i+1]->action) {
+                            std::cout << "Skipping the following actions; '"
+                                      << current_action->name
+                                      << "' is not chainable." << std::endl;
                         }
+                        break;
                     }
                 }
            }
@@ -563,7 +576,7 @@ class HorseWhisperer {
                       << " --help\" for available actions." << std::endl;
         }
 
-        return !previous_result;
+        return !previous_success;
     }
 
     template <typename Type>
