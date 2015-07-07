@@ -813,9 +813,9 @@ class HorseWhisperer {
             return ParseResult::ERROR;
         }
 
-        std::string value {};
-
         FlagType flag_type = checkAndGetTypeOfFlag(flagname);
+
+        std::string value {};
 
         if (k_v != std::string::npos) {
             value = &argv[i][k_v];
