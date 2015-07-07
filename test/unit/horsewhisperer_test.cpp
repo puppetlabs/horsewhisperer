@@ -292,12 +292,80 @@ TEST_CASE("parse", "[parse]") {
         REQUIRE(HW::GetFlag<bool>("alias") == true);
     }
 
-    SECTION("it parses and sets aliased action flagsflags") {
+    SECTION("it parses and sets aliased action flags") {
         HW::DefineActionFlag<bool>("test-action", "a alias", "aliased flag", false, nullptr);
         const char* args[] = { "test-app", "test-action", "-a"};
         REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
         REQUIRE(HW::GetFlag<bool>("a") == true);
         REQUIRE(HW::GetFlag<bool>("alias") == true);
+    }
+
+    SECTION("it parses and sets integer numbers") {
+        HW::DefineGlobalFlag<int>("int-flag", "no useful description", 42, nullptr);
+
+        SECTION("positive") {
+            SECTION("value after space") {
+                const char* args[] = { "test-app", "test-action", "--int-flag", "3"};
+                REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
+            }
+
+            SECTION("key=value format") {
+                const char* args[] = { "test-app", "test-action", "--int-flag=3"};
+                REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
+            }
+
+            REQUIRE(HW::GetFlag<int>("int-flag") == 3);
+        }
+
+        SECTION("negative") {
+            SECTION("value after space") {
+                const char* args[] = { "test-app", "test-action", "--int-flag", "-4"};
+                REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
+            }
+
+            SECTION("key=value format") {
+                const char* args[] = { "test-app", "test-action", "--int-flag=-4"};
+                REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
+            }
+
+            REQUIRE(HW::GetFlag<int>("int-flag") == -4);
+        }
+    }
+
+    SECTION("it parses negative doubles") {
+        HW::DefineGlobalFlag<double>("double-flag", "no useful description", 4.2,
+                                     nullptr);
+
+        SECTION("positive") {
+            SECTION("value after space") {
+                const char* args[] = { "test-app", "test-action", "--double-flag",
+                                       "2.718"};
+                REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
+            }
+
+            SECTION("key=value format") {
+                const char* args[] = { "test-app", "test-action",
+                                       "--double-flag=2.718"};
+                REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
+            }
+
+            REQUIRE(HW::GetFlag<double>("double-flag") == 2.718);
+        }
+
+        SECTION("negative") {
+            SECTION("value after space") {
+                const char* args[] = { "test-app", "test-action", "--double-flag",
+                                       "-3.14"};
+                REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
+            }
+
+            SECTION("key=value format") {
+                const char* args[] = { "test-app", "test-action", "--double-flag=-3.14"};
+                REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
+            }
+
+            REQUIRE(HW::GetFlag<double>("double-flag") == -3.14);
+        }
     }
 }
 
