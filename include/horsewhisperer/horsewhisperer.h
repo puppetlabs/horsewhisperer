@@ -220,7 +220,7 @@ static void SetHelpMargins(unsigned int left_margin,
 // Because regex is busted on a lot of versions of libstdc++ I'm rolling
 // my own integer validation.
 static bool validateInteger(const std::string& val) {
-    for (size_t i = 0; i < val.size(); i++) {
+    for (size_t i = (val[0] == '-' ? 1 : 0); i < val.size(); i++) {
         if ((val[i] < '0') || (val[i] > '9')) {
             return false;
         }
@@ -229,7 +229,7 @@ static bool validateInteger(const std::string& val) {
 }
 
 static bool validateDouble(const std::string& val) {
-    std::istringstream i_s { val };
+    std::istringstream i_s { (val[0] == '-' ? val.substr(1) : val) };
     double x {};
     char c;
     if (!(i_s >> x) || i_s.get(c)) {
