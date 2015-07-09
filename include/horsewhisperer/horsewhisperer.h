@@ -114,8 +114,8 @@ struct Action {
     std::map<std::string, FlagBase*> flags;
     // Action description
     std::string description;
-    // Arity of the action
-    int arity;
+    // Arity of the action, or min arity in case variable_arity is flagged
+    unsigned int arity;
     // Function called when we invoke the action
     ActionCallback action_callback;
     // Function called when we validate action arguments
@@ -126,6 +126,8 @@ struct Action {
     bool success;
     // Whenter the action can be chained with other actions
     bool chainable;
+    // Wheter we invoke the action with variable num of args
+    bool variable_arity;
 };
 
 static FlagType getTypeOfFlag(const FlagBase* flagp);
@@ -199,7 +201,8 @@ static void DefineAction(std::string action_name,
                          std::string description,
                          std::string help_string,
                          ActionCallback action_callback,
-                         ArgumentsCallback arguments_callback) __attribute__ ((unused));
+                         ArgumentsCallback arguments_callback,
+                         bool variable_arity) __attribute__ ((unused));
 static void SetAppName(std::string name) __attribute__ ((unused));
 static void SetHelpBanner(std::string banner) __attribute__ ((unused));
 static void SetVersion(std::string version) __attribute__ ((unused));
@@ -410,8 +413,10 @@ class HorseWhisperer {
                            == context_mgr_.size() - 1);
 
                     // parse arguments and action flags
-                    int arity = context_mgr_[current_context_idx_]->action->arity;
-                    if (arity > 0) {  // iff read parameters = arity
+                    auto arity = static_cast<int>(context_mgr_[current_context_idx_]->action->arity);
+
+                    if (!context_mgr_[current_context_idx_]->action->variable_arity) {
+                        // Read as many parameters as the current arity value
                         while (arity > 0) {
                             ++arg_idx;
                             if (arg_idx >= argc) {  // have we run out of tokens?
@@ -444,17 +449,9 @@ class HorseWhisperer {
                                       << "." << std::endl;
                             return ParseResult::ERROR;
                         }
-                    } else if (arity < 0) {  // if read parameters at least = arity
+                    } else {
                         // When arity is an "at least" representation we eat arguments
                         // until we either run out or until we hit a delimiter.
-
-                        if (arg_idx >= argc - 1) {
-                            std::cout << "No arguments specified for " << action << ".\n";
-                            return ParseResult::ERROR;
-                        }
-
-                        int abs_arity { -arity };
-
                         do {
                             ++arg_idx;
                             if (argv[arg_idx][0] == '-') {
@@ -462,19 +459,19 @@ class HorseWhisperer {
                                 if (parse_flag_outcome != ParseResult::OK) {
                                     return parse_flag_outcome;
                                 }
-                            }else {
+                            } else {
                                 context_mgr_[current_context_idx_]->arguments.push_back(argv[arg_idx]);
-                                --abs_arity;
+                                --arity;
                             }
                         } while ((arg_idx+1 < argc)
                                   && std::find(delimiters_.begin(), delimiters_.end(),
                                                argv[arg_idx+1]) == delimiters_.end());
 
-                        if (abs_arity > 0) {
+                        if (arity > 0) {
                             auto expected_arity = -context_mgr_[current_context_idx_]->action->arity;
                             std::cout << "Expected at least " << expected_arity
                                       << " parameters for action " << action << ". Only read "
-                                      << expected_arity - abs_arity
+                                      << expected_arity - arity
                                       << "." << std::endl;
                             return ParseResult::ERROR;
                         }
@@ -621,7 +618,8 @@ class HorseWhisperer {
     void defineAction(std::string name, int arity, bool chainable,
                       std::string description, std::string help_string,
                       ActionCallback action_callback,
-                      ArgumentsCallback arguments_callback) {
+                      ArgumentsCallback arguments_callback,
+                      bool variable_arity) {
         Action* actionp = new Action();
         actionp->name = name;
         actionp->arity = arity;
@@ -630,6 +628,7 @@ class HorseWhisperer {
         actionp->action_callback = action_callback;
         actionp->arguments_callback = arguments_callback;
         actionp->chainable = chainable;
+        actionp->variable_arity = variable_arity;
         actions_[name] = actionp;
     }
 
@@ -1089,14 +1088,16 @@ static void DefineAction(std::string action_name,
                            std::string description,
                            std::string help_string,
                            ActionCallback action_callback,
-                           ArgumentsCallback arguments_callback = nullptr) {
+                           ArgumentsCallback arguments_callback = nullptr,
+                           bool variable_arity = false) {
     HorseWhisperer::Instance().defineAction(action_name,
                                             arity,
                                             chainable,
                                             description,
                                             help_string,
                                             action_callback,
-                                            arguments_callback);
+                                            arguments_callback,
+                                            variable_arity);
 }
 
 static bool IsActionFlag(std::string action, std::string flagname) {
