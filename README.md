@@ -160,12 +160,15 @@ can be long so it is worth looking at it in detail.
                              std::string description,
                              std::string help_string,
                              std::function<int(const std::vector<std::string>& args)> action_callback,
-                             std::function<void(const std::vector<std::string>& args)> arguments_callback = nullptr)
+                             std::function<void(const std::vector<std::string>& args)> arguments_callback = nullptr,
+                             variable_arity = false)
 
 **action_name:** The name of the action. This name will always be used to refer to the action during the life of your
 application.
 
-**arity:** Arity is the amount of parameters expected by the action. Arity can either be a positive or negative integer, both being interpreted slightly differently. A positive integer means that the action expects *exactly* that many parameters (if arity is passed as 3 then we will attempt to pass exactly 3 parameters to the action.) If arity is negative it means that the action expects *at least* that many parameters (if arity is passed as -3 it means that we will attempt to pass at least 3 parameters to the action, but all parameters will be processed and passed until either **the end of ARGV** or **a delimiting symbol** is reached.)
+**arity:** Arity is the amount of parameters expected by the action. In case you
+set the **variable_arity** flag, the **arity** value will indicate the minimum
+number of arguments.
 
 **chainable:** This boolean value defines whether an action can be chained with other actions or not.
 
@@ -199,6 +202,9 @@ action_callback. As for the flag validation callback, `action_validation_error` 
         }
     }
 
+**variable_arity (optional flag - false by default)** This boolean flag
+indicates that the action accepts a variable number of arguments and that the
+**arity** value represents the minimum number of values.
 
 Here's how we define actions:
 

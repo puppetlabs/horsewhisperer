@@ -40,6 +40,23 @@ TEST_CASE("global GetFlag", "[global getflag]") {
     }
 }
 
+TEST_CASE("setDelimiters - isDelimiter", "[global setting]") {
+    HW::Reset();
+    prepareGlobal();
+
+    SECTION("no delimiters set") {
+        REQUIRE(!HW::HorseWhisperer::Instance().isDelimiter(","));
+    }
+
+    SECTION("can set and check delimiters") {
+        HW::HorseWhisperer::Instance().setDelimiters({ ",", "*" });
+
+        REQUIRE(HW::HorseWhisperer::Instance().isDelimiter(","));
+        REQUIRE(HW::HorseWhisperer::Instance().isDelimiter("*"));
+        REQUIRE(!HW::HorseWhisperer::Instance().isDelimiter("+"));
+    }
+}
+
 TEST_CASE("global SetFlag", "[global setflag]") {
     HW::Reset();
     prepareGlobal();
@@ -333,6 +350,13 @@ TEST_CASE("parse", "[parse]") {
                 REQUIRE(HW::Parse(6, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
+            SECTION("returns ParseResult::OK if 4 action arguments and a global "
+                    "are provided") {
+                const char* args[] = { "test-app", "var_args_action",
+                                       "foo", "bar", "--verbose", "spam", "beans" };
+                REQUIRE(HW::Parse(7, const_cast<char**>(args)) == HW::ParseResult::OK);
+            }
+
             SECTION("returns ParseResult::OK if 4 action arguments and a flag "
                      "are provided") {
                 const char* args[] = { "test-app", "var_args_action",
@@ -388,6 +412,10 @@ TEST_CASE("parse", "[parse]") {
                          "more than 2 args required!", testActionCallback,
                          nullptr, true);
 
+        HW::DefineAction("two_or_more_args_action", 2, false, "test action",
+                         "more than 2 args required!", testActionCallback,
+                         nullptr, true);
+
         SECTION("correctly return ParseResult::OK") {
             const char* args[] = { "test-app",
                                    "no_arg_action",
@@ -398,14 +426,38 @@ TEST_CASE("parse", "[parse]") {
             REQUIRE(HW::Parse(11, const_cast<char**>(args)) == HW::ParseResult::OK);
         }
 
+        SECTION("correctly return ParseResult::OK with a global flag in the middle") {
+            const char* args[] = { "test-app",
+                                   "no_arg_action",
+                                   "no_arg_action",
+                                   "two_args_action", "foo", "--verbose", "bar",
+                                   "var_args_action",
+                                   "var_args_action", "a", "b", "c" };
+            REQUIRE(HW::Parse(12, const_cast<char**>(args)) == HW::ParseResult::OK);
+        }
+
         SECTION("correctly return ParseResult::ERROR") {
             const char* args[] = { "test-app",
                                    "no_arg_action",
-                                   "no_arg_action", "bad_arg",
+                                   "no_arg_action", "bad_arg",  // error
                                    "two_args_action", "foo", "bar",
+                                   "var_args_action", "spam", "eggs",
                                    "var_args_action",
-                                   "var_args_action", "a", "b", "c" };
-            REQUIRE(HW::Parse(12, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+                                   "two_or_more_args_action", "a", "b", "c" };
+            REQUIRE(HW::Parse(15, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+        }
+
+        SECTION("correctly return ParseResult::OK with variable args actions") {
+            const char* args[] = { "test-app",
+                                   "no_arg_action",
+                                   "no_arg_action",
+                                   "two_args_action", "foo", "bar",
+                                   "var_args_action", "spam", "eggs",
+                                   "var_args_action",
+                                   "two_or_more_args_action", "a", "b", "c", "d", "e",
+                                   "no_arg_action",
+                                   "var_args_action", "maradona" };
+            REQUIRE(HW::Parse(19, const_cast<char**>(args)) == HW::ParseResult::OK);
         }
     }
 

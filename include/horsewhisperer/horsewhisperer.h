@@ -50,7 +50,7 @@ class action_validation_error : public horsewhisperer_error {
 // Tokens
 //
 
-static const std::string VERSION_STRING = "0.9.2";
+static const std::string VERSION_STRING = "0.10.0";
 
 // Context indexes
 static const int GLOBAL_CONTEXT_IDX = 0;
@@ -323,11 +323,11 @@ class HorseWhisperer {
                                nullptr);
     }
 
-    void setDelimiters(std::vector<std::string> delimiters) {
+    void setDelimiters(const std::vector<std::string>& delimiters) {
         delimiters_ = delimiters;
     }
 
-    bool isDelimiter(const char* argument) {
+    bool isDelimiter(const char* argument) const {
         if (std::find(delimiters_.begin(), delimiters_.end(), argument)
                 != delimiters_.end()) {
             return true;
@@ -335,17 +335,16 @@ class HorseWhisperer {
         return false;
     }
 
-    bool isActionFlag(std::string action, std::string flagname) {
-        for (const auto& flag : actions_[action]->flags) {
+    bool isActionFlag(const std::string& action_name, const std::string& flagname) {
+        for (const auto& flag : actions_[action_name]->flags) {
             if (flagname.compare(flag.first) == 0) {
                 return true;
             }
         }
-
         return false;
     }
 
-    void setContextFlags(ContextPtr& action_context, std::string action_name) {
+    void setContextFlags(ContextPtr& action_context, const std::string& action_name) {
         // Copy the specific action flags, so that, in case this
         // action has been chained multiple times, each context
         // will have a different flag instace, thus allowing to
@@ -430,8 +429,7 @@ class HorseWhisperer {
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found action: " << argv[arg_idx] << std::endl;
                                 return ParseResult::ERROR;
-                            } else if (std::find(delimiters_.begin(), delimiters_.end(),
-                                                 argv[arg_idx]) != delimiters_.end()) {  // is it a delimiter?
+                            } else if (isDelimiter(argv[arg_idx])) {  // is it a delimiter?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found delimiter: " << argv[arg_idx] << std::endl;
                                 return ParseResult::ERROR;
@@ -451,7 +449,8 @@ class HorseWhisperer {
                         }
                     } else {
                         // When arity is an "at least" representation we eat arguments
-                        // until we either run out or until we hit a delimiter.
+                        // until we either run, we hit a delimiter, or we find a known
+                        // action
                         do {
                             ++arg_idx;
                             if (argv[arg_idx][0] == '-') {
@@ -464,8 +463,8 @@ class HorseWhisperer {
                                 --arity;
                             }
                         } while ((arg_idx+1 < argc)
-                                  && std::find(delimiters_.begin(), delimiters_.end(),
-                                               argv[arg_idx+1]) == delimiters_.end());
+                                  && !isDelimiter(argv[arg_idx+1])
+                                  && !isActionDefined(argv[arg_idx+1]));
 
                         if (arity > 0) {
                             auto expected_arity = -context_mgr_[current_context_idx_]->action->arity;
@@ -1031,7 +1030,7 @@ class HorseWhisperer {
         }
     }
 
-    bool isActionDefined(std::string name) {
+    bool isActionDefined(const std::string& name) {
         return !(actions_.find(name) == actions_.end());
     }
 
