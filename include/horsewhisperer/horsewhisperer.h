@@ -430,8 +430,7 @@ class HorseWhisperer {
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found action: " << argv[arg_idx] << std::endl;
                                 return ParseResult::ERROR;
-                            } else if (std::find(delimiters_.begin(), delimiters_.end(),
-                                                 argv[arg_idx]) != delimiters_.end()) {  // is it a delimiter?
+                            } else if (isDelimiter(argv[arg_idx])) {  // is it a delimiter?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found delimiter: " << argv[arg_idx] << std::endl;
                                 return ParseResult::ERROR;
@@ -465,8 +464,7 @@ class HorseWhisperer {
                                 --arity;
                             }
                         } while ((arg_idx+1 < argc)
-                                  && std::find(delimiters_.begin(), delimiters_.end(),
-                                               argv[arg_idx+1]) == delimiters_.end()
+                                  && !isDelimiter(argv[arg_idx+1])
                                   && !isActionDefined(argv[arg_idx+1]));
 
                         if (arity > 0) {
