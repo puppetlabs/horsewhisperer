@@ -451,7 +451,8 @@ class HorseWhisperer {
                         }
                     } else {
                         // When arity is an "at least" representation we eat arguments
-                        // until we either run out or until we hit a delimiter.
+                        // until we either run, we hit a delimiter, or we find a known
+                        // action
                         do {
                             ++arg_idx;
                             if (argv[arg_idx][0] == '-') {
@@ -465,7 +466,8 @@ class HorseWhisperer {
                             }
                         } while ((arg_idx+1 < argc)
                                   && std::find(delimiters_.begin(), delimiters_.end(),
-                                               argv[arg_idx+1]) == delimiters_.end());
+                                               argv[arg_idx+1]) == delimiters_.end()
+                                  && !isActionDefined(argv[arg_idx+1]));
 
                         if (arity > 0) {
                             auto expected_arity = -context_mgr_[current_context_idx_]->action->arity;
