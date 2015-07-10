@@ -2,6 +2,19 @@
 
 Change history for HorseWhisperer.
 
+# 0.10.0
+
+Released 2015-07-10
+
+* Fixed a bug related to parsing chained actions with variable arguments.
+* Improved const correctness of a few internal methods.
+* Changed the signature of the DefineActions function. Previously, to indicate
+an action with variable number of arguments we used a negative value for the
+arity argument. We now use a separate variable_arity boolean argument for that.
+That argument is optional; it is set to false by default. In case such argument
+is set to true, the arity value will be considered as the minimum number of
+arguments that the action can be invoked with.
+
 # 0.9.2
 
 Released 2015-07-03
