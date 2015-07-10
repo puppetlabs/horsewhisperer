@@ -323,11 +323,11 @@ class HorseWhisperer {
                                nullptr);
     }
 
-    void setDelimiters(std::vector<std::string> delimiters) {
+    void setDelimiters(const std::vector<std::string>& delimiters) {
         delimiters_ = delimiters;
     }
 
-    bool isDelimiter(const char* argument) {
+    bool isDelimiter(const char* argument) const {
         if (std::find(delimiters_.begin(), delimiters_.end(), argument)
                 != delimiters_.end()) {
             return true;
@@ -335,17 +335,16 @@ class HorseWhisperer {
         return false;
     }
 
-    bool isActionFlag(std::string action, std::string flagname) {
-        for (const auto& flag : actions_[action]->flags) {
+    bool isActionFlag(const std::string& action_name, const std::string& flagname) {
+        for (const auto& flag : actions_[action_name]->flags) {
             if (flagname.compare(flag.first) == 0) {
                 return true;
             }
         }
-
         return false;
     }
 
-    void setContextFlags(ContextPtr& action_context, std::string action_name) {
+    void setContextFlags(ContextPtr& action_context, const std::string& action_name) {
         // Copy the specific action flags, so that, in case this
         // action has been chained multiple times, each context
         // will have a different flag instace, thus allowing to
@@ -1031,7 +1030,7 @@ class HorseWhisperer {
         }
     }
 
-    bool isActionDefined(std::string name) {
+    bool isActionDefined(const std::string& name) {
         return !(actions_.find(name) == actions_.end());
     }
 
