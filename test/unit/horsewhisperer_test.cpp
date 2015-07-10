@@ -40,6 +40,23 @@ TEST_CASE("global GetFlag", "[global getflag]") {
     }
 }
 
+TEST_CASE("setDelimiters - isDelimiter", "[global setting]") {
+    HW::Reset();
+    prepareGlobal();
+
+    SECTION("no delimiters set") {
+        REQUIRE(!HW::HorseWhisperer::Instance().isDelimiter(","));
+    }
+
+    SECTION("can set and check delimiters") {
+        HW::HorseWhisperer::Instance().setDelimiters({ ",", "*" });
+
+        REQUIRE(HW::HorseWhisperer::Instance().isDelimiter(","));
+        REQUIRE(HW::HorseWhisperer::Instance().isDelimiter("*"));
+        REQUIRE(!HW::HorseWhisperer::Instance().isDelimiter("+"));
+    }
+}
+
 TEST_CASE("global SetFlag", "[global setflag]") {
     HW::Reset();
     prepareGlobal();
