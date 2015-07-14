@@ -467,10 +467,10 @@ class HorseWhisperer {
                                   && !isActionDefined(argv[arg_idx+1]));
 
                         if (arity > 0) {
-                            auto expected_arity = -context_mgr_[current_context_idx_]->action->arity;
-                            std::cout << "Expected at least " << expected_arity
+                            std::cout << "Expected at least "
+                                      << context_mgr_[current_context_idx_]->action->arity
                                       << " parameters for action " << action << ". Only read "
-                                      << expected_arity - arity
+                                      << context_mgr_[current_context_idx_]->action->arity - arity
                                       << "." << std::endl;
                             return ParseResult::ERROR;
                         }
