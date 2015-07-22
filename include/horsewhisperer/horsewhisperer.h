@@ -50,7 +50,7 @@ class action_validation_error : public horsewhisperer_error {
 // Tokens
 //
 
-static const std::string VERSION_STRING = "0.10.0";
+static const std::string VERSION_STRING = "0.10.1";
 
 // Context indexes
 static const int GLOBAL_CONTEXT_IDX = 0;
@@ -392,6 +392,7 @@ class HorseWhisperer {
             // Identify if it's a flag
             if (argv[arg_idx][0] == '-') {
                 auto parse_flag_outcome = parseFlag(argv, arg_idx );
+
                 if (parse_flag_outcome != ParseResult::OK) {
                     return parse_flag_outcome;
                 }
@@ -399,6 +400,7 @@ class HorseWhisperer {
                 continue;
             } else {
                 std::string action = argv[arg_idx];
+
                 if (isActionDefined(action)) {
                     ContextPtr action_context { new Context() };
                     action_context->flags = std::map<std::string, FlagBase*> {};
@@ -434,7 +436,8 @@ class HorseWhisperer {
                                           << ". Found delimiter: " << argv[arg_idx] << std::endl;
                                 return ParseResult::ERROR;
                             } else {
-                                context_mgr_[current_context_idx_]->arguments.push_back(argv[arg_idx]);
+                                context_mgr_[current_context_idx_]->arguments
+                                    .push_back(argv[arg_idx]);
                                 arity--;
                             }
                         }
@@ -453,13 +456,18 @@ class HorseWhisperer {
                         // action
                         do {
                             ++arg_idx;
-                            if (argv[arg_idx][0] == '-') {
+
+                            if (arg_idx >= argc) {
+                                // No more tokens
+                                break;
+                            } else if (argv[arg_idx][0] == '-') {
                                 auto parse_flag_outcome = parseFlag(argv, arg_idx);
                                 if (parse_flag_outcome != ParseResult::OK) {
                                     return parse_flag_outcome;
                                 }
                             } else {
-                                context_mgr_[current_context_idx_]->arguments.push_back(argv[arg_idx]);
+                                context_mgr_[current_context_idx_]->arguments
+                                    .push_back(argv[arg_idx]);
                                 --arity;
                             }
                         } while ((arg_idx+1 < argc)

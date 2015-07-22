@@ -2,6 +2,14 @@
 
 Change history for HorseWhisperer.
 
+# 0.10.1
+
+Released 2015-07-22
+
+* Fixed parser function bug for which, in case of an action with variable arity
+and no required argument, the arguments list was improperly accessed;
+* Fixing an error message printed by the parser function.
+
 # 0.10.0
 
 Released 2015-07-10

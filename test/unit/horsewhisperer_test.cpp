@@ -201,10 +201,10 @@ TEST_CASE("action GetFlag", "[action getflag]") {
     HW::Reset();
     prepareGlobal();
     prepareAction(getTest);
-    const char* action[] = { "test-app", "test-action" };
+    const char* args[] = { "test-app", "test-action", nullptr };
 
     // duck around Wc++11-compat-deprecated-writable-strings
-    HW::Parse(2, const_cast<char**>(action));
+    HW::Parse(2, const_cast<char**>(args));
     HW::Start();
 }
 
@@ -222,10 +222,10 @@ TEST_CASE("action SetFlag", "[action setflag]") {
     HW::Reset();
     prepareGlobal();
     prepareAction(setTest);
-    const char* action[] = { "test-app", "test-action" };
+    const char* args[] = { "test-app", "test-action", nullptr };
 
     // duck around Wc++11-compat-deprecated-writable-strings
-    HW::Parse(2, const_cast<char**>(action));
+    HW::Parse(2, const_cast<char**>(args));
     HW::Start();
 }
 
@@ -239,27 +239,28 @@ TEST_CASE("parse", "[parse]") {
     prepareAction(nullptr);
 
     SECTION("returns ParseResult::OK on success") {
-        const char* args[] = { "test-app", "test-action"};
+        const char* args[] = { "test-app", "test-action", nullptr };
         REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::ParseResult::OK);
     }
 
     SECTION("returns ParseResult::HELP on the help flag") {
-        const char* args[] = { "test-app", "test-action", "--help"};
+        const char* args[] = { "test-app", "test-action", "--help", nullptr };
         REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::HELP);
     }
 
     SECTION("returns ParseResult::VERSION on the --version flag") {
-        const char* args[] = { "test-app", "test-action", "--version"};
+        const char* args[] = { "test-app", "test-action", "--version", nullptr };
         REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::VERSION);
     }
 
     SECTION("returns PARSE_EERROR on bad arguments") {
-        const char* args[] = { "test-app", "test-action", "test-smachtions"};
+        const char* args[] = { "test-app", "test-action", "test-smachtions", nullptr };
         REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::ERROR);
     }
 
     SECTION("returns ParseResult::INVALID_FLAG on a bad flag") {
-        const char* args[] = { "test-app", "test-action", "--global-bad-flag", "foo" };
+        const char* args[] = { "test-app", "test-action", "--global-bad-flag",
+                               "foo", nullptr };
         REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::INVALID_FLAG);
     }
 
@@ -267,13 +268,13 @@ TEST_CASE("parse", "[parse]") {
         HW::DefineGlobalFlag<int>("foo", "a int test flag", 0, nullptr);
         HW::DefineGlobalFlag<bool>("bar", "a bool test flag", false, nullptr);
 
-        const char* args[] = { "test-app", "test-action", "--bar", "--foo=5" };
+        const char* args[] = { "test-app", "test-action", "--bar", "--foo=5", nullptr };
         REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
     }
 
     SECTION("returns ParseResult::OK when flag is given as key=value") {
         HW::DefineGlobalFlag<int>("foo", "a test flag", 0, nullptr);
-        const char* args[] = { "test-app", "test-action", "--foo=5" };
+        const char* args[] = { "test-app", "test-action", "--foo=5", nullptr };
         REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
     }
 
@@ -282,27 +283,29 @@ TEST_CASE("parse", "[parse]") {
                          "no arg required!", testActionCallback);
 
         SECTION("returns ParseResult::ERROR if an argument is passed") {
-            const char* args[] = { "test-app", "no_arg_action", "bad_arg" };
+            const char* args[] = { "test-app", "no_arg_action", "bad_arg", nullptr };
             REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::ERROR);
         }
 
         SECTION("returns ParseResult::ERROR if an argument/flag are passed") {
-            const char* args[] = { "test-app", "no_arg_action", "bad_arg", "--verbose" };
+            const char* args[] = { "test-app", "no_arg_action", "bad_arg",
+                                   "--verbose", nullptr };
             REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::ERROR);
         }
 
         SECTION("returns ParseResult::ERROR if an flag/argument are passed") {
-            const char* args[] = { "test-app", "no_arg_action", "--verbose", "bad_arg" };
+            const char* args[] = { "test-app", "no_arg_action", "--verbose",
+                                   "bad_arg", nullptr };
             REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::ERROR);
         }
 
         SECTION("returns ParseResult::OK if no action argument is provided") {
-            const char* args[] = { "test-app", "no_arg_action" };
+            const char* args[] = { "test-app", "no_arg_action", nullptr };
             REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::ParseResult::OK);
         }
 
         SECTION("returns ParseResult::OK if just a flag is provided") {
-            const char* args[] = { "test-app", "no_arg_action", "--verbose" };
+            const char* args[] = { "test-app", "no_arg_action", "--verbose", nullptr };
             REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
         }
     }
@@ -312,23 +315,25 @@ TEST_CASE("parse", "[parse]") {
                          "2 args required!", testActionCallback);
 
         SECTION("returns ParseResult::ERROR if no argument is passed") {
-            const char* args[] = { "test-app", "two_args_action" };
+            const char* args[] = { "test-app", "two_args_action", nullptr };
             REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::ParseResult::ERROR);
         }
 
         SECTION("return ParseResult::ERROR if one action argument is missing") {
-            const char* args[] = { "test-app", "two_args_action", "spam" };
+            const char* args[] = { "test-app", "two_args_action", "spam", nullptr };
             REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::ERROR);
         }
 
         SECTION("returns ParseResult::ERROR if one action arguments is missing and a "
                 "flag is passed") {
-            const char* args[] = { "test-app", "two_args_action", "spam", "--verbose" };
+            const char* args[] = { "test-app", "two_args_action", "spam",
+                                   "--verbose", nullptr };
             REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::ERROR);
         }
 
         SECTION("returns ParseResult::OK if all action arguments are provided") {
-            const char* args[] = { "test-app", "two_args_action", "spam", "eggs" };
+            const char* args[] = { "test-app", "two_args_action", "spam",
+                                   "eggs", nullptr };
             REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
         }
     }
@@ -340,27 +345,29 @@ TEST_CASE("parse", "[parse]") {
                              nullptr, true);
 
             SECTION("returns ParseResult::OK if no action argument is provided") {
-                const char* args[] = { "test-app", "var_args_action" };
+                const char* args[] = { "test-app", "var_args_action", nullptr };
                 REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
             SECTION("returns ParseResult::OK if 4 action arguments are provided") {
                 const char* args[] = { "test-app", "var_args_action",
-                                       "foo", "bar", "spam", "beans" };
+                                       "foo", "bar", "spam", "beans", nullptr };
                 REQUIRE(HW::Parse(6, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
             SECTION("returns ParseResult::OK if 4 action arguments and a global "
                     "are provided") {
                 const char* args[] = { "test-app", "var_args_action",
-                                       "foo", "bar", "--verbose", "spam", "beans" };
+                                       "foo", "bar", "--verbose", "spam", "beans",
+                                       nullptr };
                 REQUIRE(HW::Parse(7, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
             SECTION("returns ParseResult::OK if 4 action arguments and a flag "
                      "are provided") {
                 const char* args[] = { "test-app", "var_args_action",
-                                       "foo", "bar", "spam", "beans", "--verbose" };
+                                       "foo", "bar", "spam", "beans", "--verbose",
+                                       nullptr };
                 REQUIRE(HW::Parse(7, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
         }
@@ -371,31 +378,33 @@ TEST_CASE("parse", "[parse]") {
                              nullptr, true);
 
             SECTION("returns ParseResult::ERROR if no action arguments is passed") {
-                const char* args[] = { "test-app", "two_or_more_args_action" };
+                const char* args[] = { "test-app", "two_or_more_args_action", nullptr };
                 REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::ParseResult::ERROR);
             }
 
             SECTION("return ParseResult::ERROR if one action argument is missing") {
-                const char* args[] = { "test-app", "two_or_more_args_action", "spam" };
+                const char* args[] = { "test-app", "two_or_more_args_action",
+                                       "spam", nullptr };
                 REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::ERROR);
             }
 
             SECTION("returns ParseResult::OK if 2 action arguments are provided") {
                 const char* args[] = { "test-app", "two_or_more_args_action",
-                                       "foo", "bar" };
+                                       "foo", "bar", nullptr };
                 REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
             SECTION("returns ParseResult::OK if 4 action arguments are provided") {
                 const char* args[] = { "test-app", "two_or_more_args_action",
-                                       "foo", "bar", "spam", "beans" };
+                                       "foo", "bar", "spam", "beans", nullptr };
                 REQUIRE(HW::Parse(6, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
             SECTION("returns ParseResult::OK if 4 action arguments and a flag "
                      "are provided") {
                 const char* args[] = { "test-app", "two_or_more_args_action",
-                                       "foo", "bar", "spam", "beans", "--verbose" };
+                                       "foo", "bar", "spam", "beans", "--verbose",
+                                       nullptr };
                 REQUIRE(HW::Parse(7, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
         }
@@ -422,7 +431,7 @@ TEST_CASE("parse", "[parse]") {
                                    "no_arg_action",
                                    "two_args_action", "foo", "bar",
                                    "var_args_action",
-                                   "var_args_action", "a", "b", "c" };
+                                   "var_args_action", "a", "b", "c", nullptr };
             REQUIRE(HW::Parse(11, const_cast<char**>(args)) == HW::ParseResult::OK);
         }
 
@@ -432,7 +441,7 @@ TEST_CASE("parse", "[parse]") {
                                    "no_arg_action",
                                    "two_args_action", "foo", "--verbose", "bar",
                                    "var_args_action",
-                                   "var_args_action", "a", "b", "c" };
+                                   "var_args_action", "a", "b", "c", nullptr };
             REQUIRE(HW::Parse(12, const_cast<char**>(args)) == HW::ParseResult::OK);
         }
 
@@ -443,7 +452,7 @@ TEST_CASE("parse", "[parse]") {
                                    "two_args_action", "foo", "bar",
                                    "var_args_action", "spam", "eggs",
                                    "var_args_action",
-                                   "two_or_more_args_action", "a", "b", "c" };
+                                   "two_or_more_args_action", "a", "b", "c", nullptr };
             REQUIRE(HW::Parse(15, const_cast<char**>(args)) == HW::ParseResult::ERROR);
         }
 
@@ -456,14 +465,14 @@ TEST_CASE("parse", "[parse]") {
                                    "var_args_action",
                                    "two_or_more_args_action", "a", "b", "c", "d", "e",
                                    "no_arg_action",
-                                   "var_args_action", "maradona" };
+                                   "var_args_action", "maradona", nullptr };
             REQUIRE(HW::Parse(19, const_cast<char**>(args)) == HW::ParseResult::OK);
         }
     }
 
     SECTION("it parses and sets aliased flags") {
         HW::DefineGlobalFlag<bool>("a alias", "aliased flag", false, nullptr);
-        const char* args[] = { "test-app", "test-action", "-a"};
+        const char* args[] = { "test-app", "test-action", "-a", nullptr };
         REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
         REQUIRE(HW::GetFlag<bool>("a") == true);
         REQUIRE(HW::GetFlag<bool>("alias") == true);
@@ -471,7 +480,7 @@ TEST_CASE("parse", "[parse]") {
 
     SECTION("it parses and sets aliased action flags") {
         HW::DefineActionFlag<bool>("test-action", "a alias", "aliased flag", false, nullptr);
-        const char* args[] = { "test-app", "test-action", "-a"};
+        const char* args[] = { "test-app", "test-action", "-a", nullptr };
         REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
         REQUIRE(HW::GetFlag<bool>("a") == true);
         REQUIRE(HW::GetFlag<bool>("alias") == true);
@@ -482,12 +491,14 @@ TEST_CASE("parse", "[parse]") {
 
         SECTION("positive") {
             SECTION("value after space") {
-                const char* args[] = { "test-app", "test-action", "--int-flag", "3"};
+                const char* args[] = { "test-app", "test-action", "--int-flag", "3",
+                                       nullptr };
                 REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
             SECTION("key=value format") {
-                const char* args[] = { "test-app", "test-action", "--int-flag=3"};
+                const char* args[] = { "test-app", "test-action", "--int-flag=3",
+                                       nullptr };
                 REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
@@ -496,12 +507,14 @@ TEST_CASE("parse", "[parse]") {
 
         SECTION("negative") {
             SECTION("value after space") {
-                const char* args[] = { "test-app", "test-action", "--int-flag", "-4"};
+                const char* args[] = { "test-app", "test-action", "--int-flag", "-4",
+                                       nullptr };
                 REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
             SECTION("key=value format") {
-                const char* args[] = { "test-app", "test-action", "--int-flag=-4"};
+                const char* args[] = { "test-app", "test-action", "--int-flag=-4",
+                                       nullptr };
                 REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
@@ -516,13 +529,13 @@ TEST_CASE("parse", "[parse]") {
         SECTION("positive") {
             SECTION("value after space") {
                 const char* args[] = { "test-app", "test-action", "--double-flag",
-                                       "2.718"};
+                                       "2.718", nullptr };
                 REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
             SECTION("key=value format") {
                 const char* args[] = { "test-app", "test-action",
-                                       "--double-flag=2.718"};
+                                       "--double-flag=2.718", nullptr };
                 REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
@@ -532,12 +545,13 @@ TEST_CASE("parse", "[parse]") {
         SECTION("negative") {
             SECTION("value after space") {
                 const char* args[] = { "test-app", "test-action", "--double-flag",
-                                       "-3.14"};
+                                       "-3.14", nullptr };
                 REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
             SECTION("key=value format") {
-                const char* args[] = { "test-app", "test-action", "--double-flag=-3.14"};
+                const char* args[] = { "test-app", "test-action", "--double-flag=-3.14",
+                                       nullptr };
                 REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::OK);
             }
 
@@ -555,7 +569,7 @@ TEST_CASE("HorseWhisperer::getActions" "[getActions]") {
                                  "no help", action_callback);
 
     SECTION("returns a vector containing a single action name") {
-        const char* args[] = { "test-app", "new_action", "spam", "eggs" };
+        const char* args[] = { "test-app", "new_action", "spam", "eggs", nullptr };
         std::vector<std::string> test_result { "new_action" };
         HW::Parse(4, const_cast<char**>(args));
         REQUIRE(HW::GetParsedActions() == test_result);
@@ -566,7 +580,7 @@ TEST_CASE("HorseWhisperer::getActions" "[getActions]") {
 
     SECTION("returns multiple action names") {
         const char* args[] = { "test-app", "new_action", "spam", "eggs",
-                               "new_action_2" };
+                               "new_action_2", nullptr };
         std::vector<std::string> test_result { "new_action", "new_action_2" };
         HW::Parse(5, const_cast<char**>(args));
         REQUIRE(HW::GetParsedActions() == test_result);
@@ -577,7 +591,7 @@ TEST_CASE("HorseWhisperer::getActions" "[getActions]") {
 
     SECTION("works properly with user-defined delimiters") {
         const char* args[] = { "test-app", "new_action", "foo", "bar",
-                               "+", "new_action_2" };
+                               "+", "new_action_2", nullptr };
         std::vector<std::string> test_result { "new_action", "new_action_2" };
         HW::Parse(6, const_cast<char**>(args));
         REQUIRE(HW::GetParsedActions() == test_result);
@@ -586,7 +600,7 @@ TEST_CASE("HorseWhisperer::getActions" "[getActions]") {
     SECTION("returns duplicate actions") {
         const char* args[] = { "test-app", "new_action", "foo", "bar",
                                "+", "new_action_2",
-                               "+", "new_action", "spam", "eggs" };
+                               "+", "new_action", "spam", "eggs", nullptr };
         std::vector<std::string> test_result { "new_action", "new_action_2",
                                                "new_action" };
         HW::Parse(10, const_cast<char**>(args));
@@ -610,8 +624,8 @@ TEST_CASE("HorseWhisperer::Start", "[start]") {
                          [&modify_me](std::vector<std::string>) -> int {
                             return ++modify_me; });
 
-        const char* cli[] = { "test-app", "start_test_1" };
-        HW::Parse(2, const_cast<char**>(cli));
+        const char* args[] = { "test-app", "start_test_1", nullptr };
+        HW::Parse(2, const_cast<char**>(args));
         HW::Start();
         REQUIRE(modify_me == 1);
     }
@@ -630,8 +644,9 @@ TEST_CASE("HorseWhisperer::Start", "[start]") {
                          [&modify_me2](std::vector<std::string>) -> int {
                             ++modify_me2; return 0; });
 
-        const char* cli[] = { "test-app", "chain_test_1", "+", "chain_test_2" };
-        HW::Parse(4, const_cast<char**>(cli));
+        const char* args[] = { "test-app", "chain_test_1", "+", "chain_test_2",
+                               nullptr };
+        HW::Parse(4, const_cast<char**>(args));
         HW::Start();
         REQUIRE(modify_me1 == 1);
         REQUIRE(modify_me2 == 2);
@@ -663,12 +678,13 @@ TEST_CASE("HorseWhisperer::Start", "[start]") {
         HW::DefineActionFlag<std::string>("chain_test_3", "test_flag",
                                           "no description", "foo", nullptr);
 
-        const char* cli[] = { "test-app",
-                              "chain_test_3", "arg_one", "--test_flag", "spam",
-                              "chain_test_3", "arg_two", "--test_flag", "eggs",
-                              "chain_test_3", "arg_three", "--test_flag", "beans" };
+        const char* args[] = { "test-app",
+                               "chain_test_3", "arg_one", "--test_flag", "spam",
+                               "chain_test_3", "arg_two", "--test_flag", "eggs",
+                               "chain_test_3", "arg_three", "--test_flag", "beans",
+                               nullptr };
 
-        HW::Parse(13, const_cast<char**>(cli));
+        HW::Parse(13, const_cast<char**>(args));
         HW::Start();
         REQUIRE(call_counter == 3);
     }
