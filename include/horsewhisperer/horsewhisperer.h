@@ -456,7 +456,11 @@ class HorseWhisperer {
                         // action
                         do {
                             ++arg_idx;
-                            if (argv[arg_idx][0] == '-') {
+
+                            if (arg_idx >= argc) {
+                                // No more tokens
+                                break;
+                            } else if (argv[arg_idx][0] == '-') {
                                 auto parse_flag_outcome = parseFlag(argv, arg_idx);
                                 if (parse_flag_outcome != ParseResult::OK) {
                                     return parse_flag_outcome;
