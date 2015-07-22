@@ -201,10 +201,10 @@ TEST_CASE("action GetFlag", "[action getflag]") {
     HW::Reset();
     prepareGlobal();
     prepareAction(getTest);
-    const char* action[] = { "test-app", "test-action", nullptr };
+    const char* args[] = { "test-app", "test-action", nullptr };
 
     // duck around Wc++11-compat-deprecated-writable-strings
-    HW::Parse(2, const_cast<char**>(action));
+    HW::Parse(2, const_cast<char**>(args));
     HW::Start();
 }
 
@@ -222,10 +222,10 @@ TEST_CASE("action SetFlag", "[action setflag]") {
     HW::Reset();
     prepareGlobal();
     prepareAction(setTest);
-    const char* action[] = { "test-app", "test-action", nullptr };
+    const char* args[] = { "test-app", "test-action", nullptr };
 
     // duck around Wc++11-compat-deprecated-writable-strings
-    HW::Parse(2, const_cast<char**>(action));
+    HW::Parse(2, const_cast<char**>(args));
     HW::Start();
 }
 
@@ -624,8 +624,8 @@ TEST_CASE("HorseWhisperer::Start", "[start]") {
                          [&modify_me](std::vector<std::string>) -> int {
                             return ++modify_me; });
 
-        const char* cli[] = { "test-app", "start_test_1", nullptr };
-        HW::Parse(2, const_cast<char**>(cli));
+        const char* args[] = { "test-app", "start_test_1", nullptr };
+        HW::Parse(2, const_cast<char**>(args));
         HW::Start();
         REQUIRE(modify_me == 1);
     }
@@ -644,9 +644,9 @@ TEST_CASE("HorseWhisperer::Start", "[start]") {
                          [&modify_me2](std::vector<std::string>) -> int {
                             ++modify_me2; return 0; });
 
-        const char* cli[] = { "test-app", "chain_test_1", "+", "chain_test_2",
-                              nullptr };
-        HW::Parse(4, const_cast<char**>(cli));
+        const char* args[] = { "test-app", "chain_test_1", "+", "chain_test_2",
+                               nullptr };
+        HW::Parse(4, const_cast<char**>(args));
         HW::Start();
         REQUIRE(modify_me1 == 1);
         REQUIRE(modify_me2 == 2);
@@ -678,13 +678,13 @@ TEST_CASE("HorseWhisperer::Start", "[start]") {
         HW::DefineActionFlag<std::string>("chain_test_3", "test_flag",
                                           "no description", "foo", nullptr);
 
-        const char* cli[] = { "test-app",
-                              "chain_test_3", "arg_one", "--test_flag", "spam",
-                              "chain_test_3", "arg_two", "--test_flag", "eggs",
-                              "chain_test_3", "arg_three", "--test_flag", "beans",
-                              nullptr };
+        const char* args[] = { "test-app",
+                               "chain_test_3", "arg_one", "--test_flag", "spam",
+                               "chain_test_3", "arg_two", "--test_flag", "eggs",
+                               "chain_test_3", "arg_three", "--test_flag", "beans",
+                               nullptr };
 
-        HW::Parse(13, const_cast<char**>(cli));
+        HW::Parse(13, const_cast<char**>(args));
         HW::Start();
         REQUIRE(call_counter == 3);
     }
