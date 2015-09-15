@@ -329,7 +329,7 @@ The possible return values are listed below.
     ParseResult::OK;            // success
     ParseResult::HELP;          // help request
     ParseResult::VERSION;       // version request
-    ParseResult::ERROR;         // failed to parse (e.g. missing argument)
+    ParseResult::FAILURE;       // failed to parse (e.g. missing argument)
     ParseResult::INVALID_FLAG;  // invalid flag (e.g. string instead of an integer)
 
 When parsing a given flag value, the releavant flag validation callback will be executed and a `flag_validation_error` may be thrown.

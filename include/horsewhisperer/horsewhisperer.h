@@ -57,7 +57,7 @@ static const int GLOBAL_CONTEXT_IDX = 0;
 static const int NO_CONTEXT_IDX = -1;
 
 // Parse results
-enum class ParseResult { OK, HELP, VERSION, ERROR, INVALID_FLAG };
+enum class ParseResult { OK, HELP, VERSION, FAILURE, INVALID_FLAG };
 
 // Margins for help descriptions
 static const unsigned int DESCRIPTION_MARGIN_LEFT_DEFAULT = 30;
@@ -430,11 +430,11 @@ class HorseWhisperer {
                             } else if (isActionDefined(argv[arg_idx])) {  // is it an action?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found action: " << argv[arg_idx] << std::endl;
-                                return ParseResult::ERROR;
+                                return ParseResult::FAILURE;
                             } else if (isDelimiter(argv[arg_idx])) {  // is it a delimiter?
                                 std::cout << "Expected parameter for action: " << action
                                           << ". Found delimiter: " << argv[arg_idx] << std::endl;
-                                return ParseResult::ERROR;
+                                return ParseResult::FAILURE;
                             } else {
                                 context_mgr_[current_context_idx_]->arguments
                                     .push_back(argv[arg_idx]);
@@ -448,7 +448,7 @@ class HorseWhisperer {
                                       << " parameters for action " << action << ". Only read "
                                       << context_mgr_[current_context_idx_]->action->arity - arity
                                       << "." << std::endl;
-                            return ParseResult::ERROR;
+                            return ParseResult::FAILURE;
                         }
                     } else {
                         // When arity is an "at least" representation we eat arguments
@@ -480,12 +480,12 @@ class HorseWhisperer {
                                       << " parameters for action " << action << ". Only read "
                                       << context_mgr_[current_context_idx_]->action->arity - arity
                                       << "." << std::endl;
-                            return ParseResult::ERROR;
+                            return ParseResult::FAILURE;
                         }
                     }
                 } else {
                     std::cout << "Unknown action: " << argv[arg_idx] << std::endl;
-                    return ParseResult::ERROR;
+                    return ParseResult::FAILURE;
                 }
             }
         }
@@ -816,7 +816,7 @@ class HorseWhisperer {
 
         if (!isFlagDefined(flagname)) {
             std::cout << "Unknown flag: " << flagname << std::endl;
-            return ParseResult::ERROR;
+            return ParseResult::FAILURE;
         }
 
         FlagType flag_type = checkAndGetTypeOfFlag(flagname);
@@ -846,7 +846,7 @@ class HorseWhisperer {
                     std::cout << "Flag '" << flagname
                               << "' expects a value of 'true' or 'false'"
                               << std::endl;
-                    return ParseResult::ERROR;
+                    return ParseResult::FAILURE;
                 }
             }
             setFlag<bool>(flagname, b_val);
@@ -854,7 +854,7 @@ class HorseWhisperer {
         } else {
             if (value.empty()) {
                 std::cout << "Missing value for flag: " << flagname << std::endl;
-                return ParseResult::ERROR;
+                return ParseResult::FAILURE;
             }
 
             if (flag_type == FlagType::String) {
@@ -882,7 +882,7 @@ class HorseWhisperer {
         }
 
         std::cout << flagname << " is not of a valid flag type." << std::endl;
-        return ParseResult::ERROR;
+        return ParseResult::FAILURE;
     }
 
     // Display help information for the global context
