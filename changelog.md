@@ -2,6 +2,13 @@
 
 Change history for HorseWhisperer.
 
+# 0.11.0
+
+Released 2015-09-15
+
+* Renamed ParseResult::ERROR to ParseResult::FAILURE to avoid having to undef
+the ERROR macro on Windows.
+
 # 0.10.1
 
 Released 2015-07-22
