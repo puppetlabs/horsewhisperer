@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
             case ParseResult::VERSION:
                 ShowVersion();
                 return 0;
-            case ParseResult::ERROR:
+            case ParseResult::FAILURE:
                 std::cout << "Failed to parse the command line input.\n";
                 return 1;
             case ParseResult::INVALID_FLAG:

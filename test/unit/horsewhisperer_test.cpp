@@ -253,9 +253,9 @@ TEST_CASE("parse", "[parse]") {
         REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::VERSION);
     }
 
-    SECTION("returns PARSE_EERROR on bad arguments") {
+    SECTION("returns PARSE_FAILURE on bad arguments") {
         const char* args[] = { "test-app", "test-action", "test-smachtions", nullptr };
-        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
     }
 
     SECTION("returns ParseResult::INVALID_FLAG on a bad flag") {
@@ -282,21 +282,21 @@ TEST_CASE("parse", "[parse]") {
         HW::DefineAction("no_arg_action", 0, false, "test action",
                          "no arg required!", testActionCallback);
 
-        SECTION("returns ParseResult::ERROR if an argument is passed") {
+        SECTION("returns ParseResult::FAILURE if an argument is passed") {
             const char* args[] = { "test-app", "no_arg_action", "bad_arg", nullptr };
-            REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+            REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
         }
 
-        SECTION("returns ParseResult::ERROR if an argument/flag are passed") {
+        SECTION("returns ParseResult::FAILURE if an argument/flag are passed") {
             const char* args[] = { "test-app", "no_arg_action", "bad_arg",
                                    "--verbose", nullptr };
-            REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+            REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
         }
 
-        SECTION("returns ParseResult::ERROR if an flag/argument are passed") {
+        SECTION("returns ParseResult::FAILURE if an flag/argument are passed") {
             const char* args[] = { "test-app", "no_arg_action", "--verbose",
                                    "bad_arg", nullptr };
-            REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+            REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
         }
 
         SECTION("returns ParseResult::OK if no action argument is provided") {
@@ -314,21 +314,21 @@ TEST_CASE("parse", "[parse]") {
         HW::DefineAction("two_args_action", 2, false, "test action",
                          "2 args required!", testActionCallback);
 
-        SECTION("returns ParseResult::ERROR if no argument is passed") {
+        SECTION("returns ParseResult::FAILURE if no argument is passed") {
             const char* args[] = { "test-app", "two_args_action", nullptr };
-            REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+            REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
         }
 
-        SECTION("return ParseResult::ERROR if one action argument is missing") {
+        SECTION("return ParseResult::FAILURE if one action argument is missing") {
             const char* args[] = { "test-app", "two_args_action", "spam", nullptr };
-            REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+            REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
         }
 
-        SECTION("returns ParseResult::ERROR if one action arguments is missing and a "
+        SECTION("returns ParseResult::FAILURE if one action arguments is missing and a "
                 "flag is passed") {
             const char* args[] = { "test-app", "two_args_action", "spam",
                                    "--verbose", nullptr };
-            REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+            REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
         }
 
         SECTION("returns ParseResult::OK if all action arguments are provided") {
@@ -377,15 +377,15 @@ TEST_CASE("parse", "[parse]") {
                              "more than 2 args required!", testActionCallback,
                              nullptr, true);
 
-            SECTION("returns ParseResult::ERROR if no action arguments is passed") {
+            SECTION("returns ParseResult::FAILURE if no action arguments is passed") {
                 const char* args[] = { "test-app", "two_or_more_args_action", nullptr };
-                REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+                REQUIRE(HW::Parse(2, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
             }
 
-            SECTION("return ParseResult::ERROR if one action argument is missing") {
+            SECTION("return ParseResult::FAILURE if one action argument is missing") {
                 const char* args[] = { "test-app", "two_or_more_args_action",
                                        "spam", nullptr };
-                REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+                REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
             }
 
             SECTION("returns ParseResult::OK if 2 action arguments are provided") {
@@ -445,7 +445,7 @@ TEST_CASE("parse", "[parse]") {
             REQUIRE(HW::Parse(12, const_cast<char**>(args)) == HW::ParseResult::OK);
         }
 
-        SECTION("correctly return ParseResult::ERROR") {
+        SECTION("correctly return ParseResult::FAILURE") {
             const char* args[] = { "test-app",
                                    "no_arg_action",
                                    "no_arg_action", "bad_arg",  // error
@@ -453,7 +453,7 @@ TEST_CASE("parse", "[parse]") {
                                    "var_args_action", "spam", "eggs",
                                    "var_args_action",
                                    "two_or_more_args_action", "a", "b", "c", nullptr };
-            REQUIRE(HW::Parse(15, const_cast<char**>(args)) == HW::ParseResult::ERROR);
+            REQUIRE(HW::Parse(15, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
         }
 
         SECTION("correctly return ParseResult::OK with variable args actions") {
