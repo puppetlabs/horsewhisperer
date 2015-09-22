@@ -53,7 +53,7 @@ check_strings "$TIRED_MSG" 'The pony is too tired to gallop.'
 
 # no action arguments specified: we expect an error message
 ARG_ERROR=`"$EXAMPLE" trot`
-check_strings "$ARG_ERROR" '''No arguments specified for trot.
+check_strings "$ARG_ERROR" '''Expected at least 2 parameters for action trot. Only read 0.
 Failed to parse the command line input.'''
 
 # not all action arguments specified: we expect an error message
@@ -67,13 +67,11 @@ check_numeric_pair $TROT_MSG_NUM 3
 
 # invalid action arguments: we expect a validation error
 INVALID_ARG_ERROR=`"$EXAMPLE" trot 'mode world champion' panda`
-check_strings "$INVALID_ARG_ERROR" '''Error: invalid trot argument panda.
-Failed to validate the action arguments.'''
+check_strings "$INVALID_ARG_ERROR" "unknown trot mode 'panda'"
 
 # invalid action arguments: we expect a validation error when chaining
 INVALID_ARG_ERROR=`"$EXAMPLE" gallop + trot 'mode world champion' 'panda way' --ponies 3`
-check_strings "$INVALID_ARG_ERROR" '''Error: invalid trot argument panda way.
-Failed to validate the action arguments.'''
+check_strings "$INVALID_ARG_ERROR" "unknown trot mode 'panda way'"
 
 # chaining works
 CHAINING_MSG=`"$EXAMPLE" gallop + trot 'mode one' 'mode two' 'mode three' --ponies 4`
