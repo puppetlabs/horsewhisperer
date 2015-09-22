@@ -253,6 +253,18 @@ TEST_CASE("parse", "[parse]") {
         REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::VERSION);
     }
 
+    SECTION("returns ParseResult::VERSION without short flag") {
+        HW::SetVersion("1.1");
+        const char* args[] = { "test-app", "test-action", "--version", nullptr };
+        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::VERSION);
+    }
+
+    SECTION("returns ParseResult::VERSION on the short flag") {
+        HW::SetVersion("1.1", "V");
+        const char* args[] = { "test-app", "test-action", "-V", nullptr };
+        REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::VERSION);
+    }
+
     SECTION("returns PARSE_FAILURE on bad arguments") {
         const char* args[] = { "test-app", "test-action", "test-smachtions", nullptr };
         REQUIRE(HW::Parse(3, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
