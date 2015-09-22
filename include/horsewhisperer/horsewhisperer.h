@@ -1,5 +1,5 @@
-#ifndef HORSEWHISPERER_INCLUDE_HORSE_WHISPERER_H_
-#define HORSEWHISPERER_INCLUDE_HORSE_WHISPERER_H_
+#ifndef INCLUDE_HORSEWHISPERER_HORSEWHISPERER_H_
+#define INCLUDE_HORSEWHISPERER_HORSEWHISPERER_H_
 
 #include <string>
 #include <map>
@@ -10,7 +10,6 @@
 #include <iomanip>
 #include <cctype>
 #include <algorithm>
-#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <cassert>
@@ -91,7 +90,7 @@ using ArgumentsCallback = std::function<void(const Arguments& arguments)>;
 using ActionCallback = std::function<int(const Arguments& arguments)>;
 
 struct FlagBase {
-    virtual ~FlagBase() {};
+    virtual ~FlagBase() {}
     std::string aliases;
     std::string description;
 };
@@ -391,7 +390,7 @@ class HorseWhisperer {
         for (int arg_idx = 1; arg_idx < argc; arg_idx++) {
             // Identify if it's a flag
             if (argv[arg_idx][0] == '-') {
-                auto parse_flag_outcome = parseFlag(argv, arg_idx );
+                auto parse_flag_outcome = parseFlag(argv, arg_idx);
 
                 if (parse_flag_outcome != ParseResult::OK) {
                     return parse_flag_outcome;
@@ -414,7 +413,8 @@ class HorseWhisperer {
                            == context_mgr_.size() - 1);
 
                     // parse arguments and action flags
-                    auto arity = static_cast<int>(context_mgr_[current_context_idx_]->action->arity);
+                    auto arity =
+                        static_cast<int>(context_mgr_[current_context_idx_]->action->arity);
 
                     if (!context_mgr_[current_context_idx_]->action->variable_arity) {
                         // Read as many parameters as the current arity value
@@ -585,7 +585,7 @@ class HorseWhisperer {
 
     template <typename Type>
     void defineGlobalFlag(std::string aliases, std::string description,
-                          Type default_value, FlagCallback<Type> flag_callback){
+                          Type default_value, FlagCallback<Type> flag_callback) {
         Flag<Type>* flagp = new Flag<Type>();
         flagp->aliases = aliases;
         flagp->value = default_value;
@@ -607,7 +607,7 @@ class HorseWhisperer {
 
     template <typename Type>
     void defineActionFlag(std::string action_name, std::string aliases, std::string description,
-                          Type default_value, FlagCallback<Type> flag_callback){
+                          Type default_value, FlagCallback<Type> flag_callback) {
         Flag<Type>* flagp = new Flag<Type>();
         flagp->aliases = aliases;
         flagp->value = default_value;
@@ -647,7 +647,7 @@ class HorseWhisperer {
         }
 
         throw undefined_flag_error { "undefined flag: " + name };
-    };
+    }
 
     FlagType checkAndGetTypeOfFlag(const std::string& flag_name) {
         int context_idx = getContextIdxIfDefined(flag_name);
@@ -684,7 +684,7 @@ class HorseWhisperer {
         }
 
         throw undefined_flag_error { "undefined flag: " + name };
-    };
+    }
 
     std::vector<std::string> getParsedActions() {
         std::vector<std::string> action_container {};
@@ -700,14 +700,16 @@ class HorseWhisperer {
         return action_container;
     }
 
-    void setHelpMargins(unsigned int left_margin, unsigned int right_margin) {description_margin_left_ = left_margin;
+    void setHelpMargins(unsigned int left_margin, unsigned int right_margin) {
+        description_margin_left_ = left_margin;
         description_margin_right_ = right_margin;
     }
 
     // Debug method
     void printState() {
         std::stringstream ss {};
-        ss << "Current context index = " << std::to_string(current_context_idx_);
+        ss << "Current context index = "
+           << std::to_string(current_context_idx_);
         if (context_mgr_.size() > 1) {
             for (size_t idx = 1; idx < context_mgr_.size(); idx++) {
                 ss << "\n" << context_mgr_[idx]->toString();
@@ -772,7 +774,7 @@ class HorseWhisperer {
         defineGlobalFlag<bool>("h help", "Show this message", false, nullptr);
         defineGlobalFlag<int>("vlevel", "", 0, nullptr);
         defineGlobalFlag<bool>("verbose", "Set verbose output", false,
-                               [this](bool) { setFlag<int>("vlevel", 1); });
+                               [this] (bool val) { setFlag<int>("vlevel", 1); });
     }
 
     ParseResult parseFlag(char* argv[], int& i) {
@@ -793,10 +795,14 @@ class HorseWhisperer {
             ++k_v += offset;
         }
 
-        //  Deal with special vlevel flags
+        // Deal with special vlevel flags
         if (flagname[0] == 'v') {
             size_t vlevel = 0;
-            while (flagname[++vlevel] == 'v'); // keep counting the v's
+
+            while (flagname[++vlevel] == 'v') {
+                // keep counting the v's
+            }
+
             if (vlevel == flagname.size()) {
                 setFlag<bool>("verbose", true);
                 setFlag<int>("vlevel", vlevel);
@@ -1162,4 +1168,4 @@ static void SetHelpMargins(unsigned int left_margin, unsigned int right_margin) 
 
 }  // namespace HorseWhisperer
 
-#endif  // HORSEWHISPERER_INCLUDE_HORSE_WHISPERER_H_
+#endif  // INCLUDE_HORSEWHISPERER_HORSEWHISPERER_H_
