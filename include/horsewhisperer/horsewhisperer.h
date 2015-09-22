@@ -960,7 +960,7 @@ class HorseWhisperer {
             if (alias != "") {
                 output << "\n";
                 output << std::setw(description_margin_left_) << std::left;
-                last_alias_size = alias.size() + arg.size();
+                last_alias_size = alias.size();
 
                 if (last_alias_size == 1) {
                     output << "   -" + alias + arg;
