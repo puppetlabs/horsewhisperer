@@ -77,12 +77,13 @@ int main(int argc, char* argv[]) {
     DefineGlobalFlag<int>("ponies", "all the ponies", 1, validation);
 
     // Define action: gallop
-    DefineAction("gallop", 0, true, "make the ponies gallop", gallop_help, gallop);
+    DefineAction("gallop", 0, true, "make the ponies gallop", gallop_help,
+                 gallop, nullptr, false);
     DefineActionFlag<bool>("gallop", "tired", "are the horses tired?", false, nullptr);
 
     // Define action: trot (at least two arguments are required)
-    DefineAction("trot", -2, true, "make the ponies trot in some way", trot_help,
-                 trot, trotArgumentsCallback);
+    DefineAction("trot", 2, true, "make the ponies trot in some way", trot_help,
+                 trot, trotArgumentsCallback, true);
 
     // Parse command line: global flags, action arguments, and action flags
     try {
