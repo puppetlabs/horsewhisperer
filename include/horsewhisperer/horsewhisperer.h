@@ -204,7 +204,7 @@ static void DefineAction(std::string action_name,
                          bool variable_arity) __attribute__ ((unused));
 static void SetAppName(std::string name) __attribute__ ((unused));
 static void SetHelpBanner(std::string banner) __attribute__ ((unused));
-static void SetVersion(std::string version) __attribute__ ((unused));
+static void SetVersion(std::string version, std::string short_flag) __attribute__ ((unused));
 static void SetDelimiters(std::vector<std::string> delimiters) __attribute__ ((unused));
 static ParseResult Parse(int argc, char** argv) __attribute__ ((unused));
 static void ShowHelp() __attribute__ ((unused));
@@ -316,9 +316,14 @@ class HorseWhisperer {
         help_banner_ = banner;
     }
 
-    void setVersionString(std::string version_string) {
+    void setVersionString(std::string version_string, std::string short_flag_string) {
         version_string_ = version_string;
-        defineGlobalFlag<bool>("version", "Display version information", false,
+        version_short_flag_string_ = short_flag_string;
+        std::string flag_string = "version";
+        if (short_flag_string != "") {
+            flag_string = short_flag_string + " " + flag_string;
+        }
+        defineGlobalFlag<bool>(flag_string, "Display version information", false,
                                nullptr);
     }
 
@@ -745,6 +750,7 @@ class HorseWhisperer {
 
     // Version information
     std::string version_string_;
+    std::string version_short_flag_string_;
 
     // Margins, indicated as number of columns
     unsigned int description_margin_left_;
@@ -768,6 +774,7 @@ class HorseWhisperer {
         application_name_ = "";
         help_banner_ = "";
         version_string_ = "";
+        version_short_flag_string_ = "";
         description_margin_left_ = DESCRIPTION_MARGIN_LEFT_DEFAULT;
         description_margin_right_ = DESCRIPTION_MARGIN_RIGHT_DEFAULT;
 
@@ -816,7 +823,7 @@ class HorseWhisperer {
         }
 
         // Deal with the special --version flag
-        if (flagname == "version") {
+        if (flagname == "version" || flagname == version_short_flag_string_) {
             return ParseResult::VERSION;
         }
 
@@ -1125,8 +1132,8 @@ static void SetHelpBanner(std::string banner) {
     HorseWhisperer::Instance().setHelpBanner(banner);
 }
 
-static void SetVersion(std::string version_string) {
-    HorseWhisperer::Instance().setVersionString(version_string);
+static void SetVersion(std::string version_string, std::string short_flag_string = "") {
+    HorseWhisperer::Instance().setVersionString(version_string, short_flag_string);
 }
 
 static void SetDelimiters(std::vector<std::string> delimiters) {

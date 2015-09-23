@@ -102,6 +102,16 @@ will change the version message to
     $ myprog --version
     MyProg version - 0.1.0
 
+A short flag for the version can be supplied as the second argument:
+
+    // void SetVersion(std::string version, std::string short_flag);
+    HorseWhisperer::SetVersion("MyProg version - 0.1.0\n", "V");
+
+will allow the invocation
+
+    $ myprog -V
+    MyProg version - 0.1.0
+
 Finally, a word on delimiters. By default Horse Whisperer has no delimiting symbols and chaining commands
 is done simply by following up one command with another. There are certain cases where this behaviour is not optimal, so it is posible to define delimitors with the *SetDelimters* function. Note that it is not advised to use a dash as
 a delimeter; dashes are used to identify flags.
