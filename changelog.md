@@ -2,6 +2,15 @@
 
 Change history for HorseWhisperer.
 
+# 0.11.1
+
+Released 2015-10-02
+
+* Fixed example and system test script by updating to previous changes.
+* Allow short flag for version: -V.
+* Fixed the way short options are listed in the help message.
+* Allow showing only the global section in the help message.
+
 # 0.11.0
 
 Released 2015-09-15
