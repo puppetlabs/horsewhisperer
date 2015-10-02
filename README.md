@@ -350,6 +350,11 @@ Once the parsing operation is complete, the action validation callbacks will be 
 If the HorseWhisperer::Parse function returns ParseResult::HELP, you can simply call
 HorseWhisperer::ShowHelp to display the requested help message (global or action-specific).
 
+The function accepts an optional boolean argument, `show_actions_help`. It
+indicates whether or not an action section will be included in the displayed
+help message; this is useful in case you have a single action defined and you're
+only interested in the global section. Such parameter is true by default.
+
 ### Executing actions
 
 When the commandline has been parsed starting your chain of action is as simple as calling the Start() function. Actions will continue to be executed until either the end of the list is reached or an action fails. When finished it will return the result of all the executed actions and'ed together (a return value of 0 means everything succeeded, 1 means the last attempt at executing an action failed).
