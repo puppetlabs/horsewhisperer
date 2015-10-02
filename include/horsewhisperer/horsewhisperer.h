@@ -207,7 +207,7 @@ static void SetHelpBanner(std::string banner) __attribute__ ((unused));
 static void SetVersion(std::string version, std::string short_flag) __attribute__ ((unused));
 static void SetDelimiters(std::vector<std::string> delimiters) __attribute__ ((unused));
 static ParseResult Parse(int argc, char** argv) __attribute__ ((unused));
-static void ShowHelp() __attribute__ ((unused));
+static void ShowHelp(bool show_actions_help = true) __attribute__ ((unused));
 static void ShowVersion() __attribute__ ((unused));
 static std::vector<std::string> GetParsedActions() __attribute__ ((unused));
 static int Start() __attribute__ ((unused));
@@ -521,11 +521,11 @@ class HorseWhisperer {
 
     // Dynamically output help information based on registered global and action
     // specific flags
-    void help() {
+    void help(bool show_actions_help) {
         if (context_mgr_[current_context_idx_]->action) {
             actionHelp();
         } else {
-            globalHelp();
+            globalHelp(show_actions_help);
         }
     }
 
@@ -899,23 +899,31 @@ class HorseWhisperer {
     }
 
     // Display help information for the global context
-    void globalHelp() {
+    void globalHelp(bool show_actions_help) {
         std::cout << help_banner_ << std::endl;
         std::cout << std::endl;
 
-        std::cout << "Global options:";
+        if (show_actions_help) {
+            std::cout << "Global options:";
+        } else {
+            std::cout << "Options:";
+        }
 
         for (const auto& flag : registered_flags_["global"]) {
             writeFlagHelp(flag);
         }
 
-        std::cout << "\n\nActions:\n";
-        for (const auto& action : actions_) {
-            writeActionDescription(action.second);
+        if (show_actions_help) {
+            std::cout << "\n\nActions:\n";
+            for (const auto& action : actions_) {
+                writeActionDescription(action.second);
+            }
+
+            std::cout << "\nFor action specific help run \"" << application_name_
+                      << " <action> --help\"";
         }
 
-        std::cout << "\nFor action specific help run \"" << application_name_
-                  << " <action> --help\"" << std::endl;
+        std::cout << std::endl << std::endl;
     }
 
     // Display help information for the current action context
@@ -1149,8 +1157,8 @@ static ParseResult Parse(int argc, char** argv) {
     return HorseWhisperer::Instance().parse(argc, argv);
 }
 
-static void ShowHelp() {
-    HorseWhisperer::Instance().help();
+static void ShowHelp(bool show_actions_help) {
+    HorseWhisperer::Instance().help(show_actions_help);
 }
 
 static void ShowVersion() {
