@@ -323,8 +323,8 @@ class HorseWhisperer {
         if (short_flag_string != "") {
             flag_string = short_flag_string + " " + flag_string;
         }
-        defineGlobalFlag<bool>(flag_string, "Display version information", false,
-                               nullptr);
+        defineGlobalFlag<bool>(flag_string, "Display version information and quit",
+                               false, nullptr);
     }
 
     void setDelimiters(const std::vector<std::string>& delimiters) {
