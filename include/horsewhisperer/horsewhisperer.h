@@ -49,7 +49,7 @@ class action_validation_error : public horsewhisperer_error {
 // Tokens
 //
 
-static const std::string VERSION_STRING = "0.11.1";
+static const std::string VERSION_STRING = "0.11.2";
 
 // Context indexes
 static const int GLOBAL_CONTEXT_IDX = 0;
