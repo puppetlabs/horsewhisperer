@@ -2,6 +2,12 @@
 
 Change history for HorseWhisperer.
 
+# 0.11.2
+
+Released 2015-10-20
+
+* Improved help message for --version flag.
+
 # 0.11.1
 
 Released 2015-10-02
