@@ -14,6 +14,10 @@
 #include <stdexcept>
 #include <cassert>
 
+// Used by consumers to export Horsewhisperer configuration from a shared library.
+#ifndef HORSEWHISPERER_EXPORT
+#define HORSEWHISPERER_EXPORT
+#endif
 
 namespace HorseWhisperer {
 
@@ -288,7 +292,7 @@ static FlagType getTypeOfFlag(const FlagBase* flagp) {
 // HorseWhisperer
 //
 
-class HorseWhisperer {
+class HORSEWHISPERER_EXPORT HorseWhisperer {
   public:
     // Return reference to instance of HorseWhisperer singleton
     static HorseWhisperer& Instance() {
