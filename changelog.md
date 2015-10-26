@@ -2,6 +2,12 @@
 
 Change history for HorseWhisperer.
 
+# 0.11.3
+
+Released 2015-10-26
+
+* Added macro to enable symbol visibility control for shared libraries.
+
 # 0.11.2
 
 Released 2015-10-20
