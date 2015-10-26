@@ -31,6 +31,9 @@ The Horse Whisperer can be used in your code by simply including the header file
 It is implemented as a singleton object and in most cases it is expected to exist for the
 duration of of the program invoking it.
 
+Note: To use the singleton object across shared library boundaries when compiling with
+visibility attributes, define HORSEWHISPERER\_EXPORT.
+
 When first referencing the singleton three flags will be created for you by default.
 
  * --help
