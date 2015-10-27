@@ -1,25 +1,26 @@
 language: cpp
 compiler: gcc
+sudo: false
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - gcc-4.8
+      - g++-4.8
+
 
 before_install:
-  # 'python-software-properties' provides add-apt-repository
-  - sudo apt-get -y install python-software-properties
-  # which is needed to add the ppa that has gcc 4.8
-  - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-  - sudo apt-get update
-  # which is needed to install gcc 4.8
-  - sudo apt-get -y install gcc-4.8
-  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.8 50
-  # and g++ 4.8
-  - sudo apt-get -y install g++-4.8
-  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.8 50
-  # grab a pre-built cmake 2.8.12 from s3
-  - wget https://s3.amazonaws.com/kylo-pl-bucket/cmake_install.tar.bz2
-  - tar xjvf cmake_install.tar.bz2 --strip 1 -C $HOME
+  # grab a pre-built cmake 3.2.3
+  - wget http://www.cmake.org/files/v3.2/cmake-3.2.3-Linux-x86_64.tar.gz
+  - tar xzvf cmake-3.2.3-Linux-x86_64.tar.gz --strip 1 -C $HOME
 
 script:
+  # Set compiler to GCC 4.8 here, as Travis overrides the global variables.
+  - export CC=gcc-4.8 CXX=g++-4.8
   - cd ./examples
-  - "g++ -std=c++11 example1.cpp -o example"
+  - "g++-4.8 -std=c++11 example1.cpp -o example"
   - cd ../test
   - mkdir release
   - cd ./release
