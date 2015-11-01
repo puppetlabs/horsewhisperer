@@ -360,9 +360,18 @@ only interested in the global section. Such parameter is true by default.
 
 ### Executing actions
 
-When the commandline has been parsed starting your chain of action is as simple as calling the Start() function. Actions will continue to be executed until either the end of the list is reached or an action fails. When finished it will return the result of all the executed actions and'ed together (a return value of 0 means everything succeeded, 1 means the last attempt at executing an action failed).
-In case a previous HorseWhisperer::Parse call did not return ParseResult::OK, the start function will
-immediately return 1, without executing any action callback.
+When the commandline has been parsed, starting your chain of action is as simple
+as calling the Start() function. Actions will continue to be executed until
+either the end of the list is reached or an action fails. Note the Horse Whisperer
+will mark an action as failed if its exit code is not 0.
+
+HorseWhisperer::Start will return 0, if all of the executed actions succeeded,
+or the exit code of the failed action. Also, if the callback of a requested was
+was not defined, the Start() function will return 1.
+
+In case a previous HorseWhisperer::Parse call did not return ParseResult::OK,
+the start function will immediately return 1, without executing any action
+callback.
 
     // int Start();
     return Start();
