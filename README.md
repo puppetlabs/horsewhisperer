@@ -2,7 +2,7 @@
 
 ## Wait, what?
 
-The HorseWhisperer is a command line parser and chained execution framework written in C++ (11).
+The Horse Whisperer is a command line parser and chained execution framework written in C++ (11).
 
 (The Horse Whisperer should not be considered as a replacement for a commandline flags processing
 library like [gflags](https://code.google.com/p/gflags/), but instead be used in the
@@ -72,7 +72,7 @@ At any point after declaring a flag it's value can be set or looked up by the fo
     template <typename FlagType>
     bool SetFlag(std::string flag_name, FlagType value)
 
-HorseWhisperer will throw an "undefined_flag_error" exception when trying to apply GetFlag or
+The Horse Whisperer will throw an "undefined_flag_error" exception when trying to apply GetFlag or
 SetFlag to an undefined flag.
 
 The vlevel value can be accessed by calling GetFlag:
@@ -115,9 +115,9 @@ will allow the invocation
     $ myprog -V
     MyProg version - 0.1.0
 
-Finally, a word on delimiters. By default Horse Whisperer has no delimiting symbols and chaining commands
-is done simply by following up one command with another. There are certain cases where this behaviour is not optimal, so it is posible to define delimitors with the *SetDelimters* function. Note that it is not advised to use a dash as
-a delimeter; dashes are used to identify flags.
+Finally, a word on delimiters. By default the Horse Whisperer has no delimiting symbols and chaining commands
+is done simply by following up one command with another. There are certain cases where this behaviour is not optimal, so it is possible to define delimiters with the *SetDelimters* function. Note that it is not advised to use a dash as
+a delimiter; dashes are used to identify flags.
 
     // void SetDelimiters(std::vector<std::string> delimiters)
     SetDelimiters(std::vector<std::string>{"+", ";", "_then"});
@@ -345,8 +345,8 @@ The possible return values are listed below.
     ParseResult::FAILURE;       // failed to parse (e.g. missing argument)
     ParseResult::INVALID_FLAG;  // invalid flag (e.g. string instead of an integer)
 
-When parsing a given flag value, the releavant flag validation callback will be executed and a `flag_validation_error` may be thrown.
-Once the parsing operation is complete, the action validation callbacks will be executed to validate the action argumetns; an `action_validation_error` may be thrown.
+When parsing a given flag value, the relevant flag validation callback will be executed and a `flag_validation_error` may be thrown.
+Once the parsing operation is complete, the action validation callbacks will be executed to validate the action arguments; an `action_validation_error` may be thrown.
 
 ### Displaying the help message
 
