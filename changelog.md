@@ -2,6 +2,13 @@
 
 Change history for HorseWhisperer.
 
+# 0.12.0
+
+Released 2015-11-02
+
+* Beahaviour change for the Start() function; in case of failure, it
+will now return the exit code of the action that failed, instead of 1.
+
 # 0.11.3
 
 Released 2015-10-26
