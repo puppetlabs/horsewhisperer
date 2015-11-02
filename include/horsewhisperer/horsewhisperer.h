@@ -538,20 +538,20 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
         std::cout << version_string_;
     }
 
-    bool whisper() {
+    int whisper() {
         if (!parsed_) {
-            return false;
+            return EXIT_FAILURE;
         }
 
         current_context_idx_ = GLOBAL_CONTEXT_IDX - 1;
-        bool previous_success = true;
+        int previous_exit_code = EXIT_SUCCESS;
 
         if (context_mgr_.size() > 1) {
             for (size_t i = 0; i < context_mgr_.size(); i++) {
                 current_context_idx_++;
                 if (context_mgr_[i]->action) {
                     auto& current_action = context_mgr_[i]->action;
-                    if (!previous_success) {
+                    if (previous_exit_code != EXIT_SUCCESS) {
                         std::cout << "Not starting action '"
                                   << current_action->name
                                   << "'. Previous action failed to complete "
@@ -559,7 +559,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
                     } else if (!current_action->action_callback) {
                         std::cout << "No calback has been defined for action '"
                                   << current_action->name << "'." << std::endl;
-                        previous_success = false;
+                        previous_exit_code = EXIT_FAILURE;
                     } else {
                         // Record the current_context_idx_. Calling parse inside
                         // an action_callback allows the context list to grow
@@ -567,8 +567,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
                         // the current_context_index.
                         int tmp = current_context_idx_;
 
-                        // Flip it because success is 0
-                        previous_success = !current_action->action_callback(
+                        previous_exit_code = current_action->action_callback(
                                                 context_mgr_[i]->arguments);
                         current_context_idx_ = tmp;
                     }
@@ -589,7 +588,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
                       << " --help\" for available actions." << std::endl;
         }
 
-        return !previous_success;
+        return previous_exit_code;
     }
 
     template <typename Type>

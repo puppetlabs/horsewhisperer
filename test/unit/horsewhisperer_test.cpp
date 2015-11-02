@@ -624,22 +624,35 @@ TEST_CASE("HorseWhisperer::Start", "[start]") {
     HW::Reset();
     prepareGlobal();
 
-    SECTION("returns false in case of missing action callback") {
+    SECTION("returns EXIT_FAILURE in case of missing action callback") {
         HW::DefineAction("start_test_1", 0, false, "test-action", "no help",
                          nullptr);
-        REQUIRE(!HW::Start());
+        REQUIRE(HW::Start() == EXIT_FAILURE);
     }
 
     SECTION("it executes an action") {
         int modify_me = 0;
         HW::DefineAction("start_test_1", 0, false, "test-action", "no help",
                          [&modify_me](std::vector<std::string>) -> int {
-                            return ++modify_me; });
+                            return ++modify_me;
+                         });
 
         const char* args[] = { "test-app", "start_test_1", nullptr };
         HW::Parse(2, const_cast<char**>(args));
         HW::Start();
         REQUIRE(modify_me == 1);
+    }
+
+    SECTION("it returns correctly the exit code") {
+        HW::DefineAction("start_test_1", 0, false, "test-action", "no help",
+                         [](std::vector<std::string>) -> int {
+                            return 42;
+                         });
+
+        const char* args[] = { "test-app", "start_test_1", nullptr };
+        HW::Parse(2, const_cast<char**>(args));
+
+        REQUIRE(HW::Start() == 42);
     }
 
     SECTION("it can chain actions") {
@@ -662,6 +675,27 @@ TEST_CASE("HorseWhisperer::Start", "[start]") {
         HW::Start();
         REQUIRE(modify_me1 == 1);
         REQUIRE(modify_me2 == 2);
+    }
+
+    SECTION("it returns the exit code of the last executed action") {
+        std::vector<std::string> delim { "+" };
+        HW::SetDelimiters(delim);
+        HW::DefineAction("successful_action", 0, true, "", "",
+                         [](std::vector<std::string>) -> int {
+                            return EXIT_SUCCESS;
+                         });
+        HW::DefineAction("fail_action", 0, true, "", "",
+                         [](std::vector<std::string>) -> int {
+                            return 42;
+                         });
+
+        const char* args[] = { "test-app", "successful_action", "+",
+                               "successful_action", "+", "fail_action", "+",
+                               "successful_action", "+", "successful_action",
+                               nullptr };
+        HW::Parse(10, const_cast<char**>(args));
+
+        REQUIRE(HW::Start() == 42);
     }
 
     SECTION("chained actions have confined flags and arguments") {
