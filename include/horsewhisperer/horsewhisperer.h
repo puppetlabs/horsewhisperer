@@ -960,6 +960,9 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
         std::string arg {};
         size_t last_alias_size { 0 };
 
+        if (flag->description == "<hidden>")
+          return;
+
         switch (getTypeOfFlag(flag)) {
             case FlagType::Bool:
                 // No argument
