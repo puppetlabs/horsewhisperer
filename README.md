@@ -134,7 +134,9 @@ Global context flags can be defined with the `DefineGlobalFlag` templated functi
 
 **aliases:** Combination of short and long names, space separated, which can be used to set and look up the flag.
 
-**description:** Short description which will be displayed when the --help flag is used.
+**description:** Short description which will be displayed when the --help
+  flag is used. If the description is the string `<hidden>`, this flag will
+  not be shown by --help
 
 **default_value:** Default value of the flag which is set.
 
