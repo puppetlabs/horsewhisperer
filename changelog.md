@@ -2,6 +2,13 @@
 
 Change history for HorseWhisperer.
 
+# 0.12.1
+
+Released 2015-06-01
+
+* When a flag is defined with a description equal to "<hidden>", it
+won't be shown by --help.
+
 # 0.12.0
 
 Released 2015-11-02
