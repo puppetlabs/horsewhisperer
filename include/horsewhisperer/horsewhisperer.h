@@ -70,7 +70,7 @@ static const unsigned int DESCRIPTION_MARGIN_RIGHT_DEFAULT = 80;
 // Types
 //
 
-enum FlagType { Bool, Int, Double, String };
+enum class FlagType { Bool, Int, Double, String };
 
 // Callback specified for a given value; called whenever the setFlag()
 // function is executed in order to validate the flag argument - it
@@ -106,15 +106,10 @@ struct Flag : FlagBase {
 };
 
 struct Action {
-    ~Action() {
-        for (auto& flag : flags) {
-            delete flag.second;
-        }
-    }
     // Action name
     std::string name;
     // Keys local to the action
-    std::map<std::string, FlagBase*> flags;
+    std::map<std::string, std::shared_ptr<FlagBase>> flags;
     // Action description
     std::string description;
     // Arity of the action, or min arity in case variable_arity is flagged
@@ -137,9 +132,9 @@ static FlagType getTypeOfFlag(const FlagBase* flagp);
 
 struct Context {
     // Flags defined for the given context
-    std::map<std::string, FlagBase*> flags;
+    std::map<std::string, std::shared_ptr<FlagBase>> flags;
     // What this context is doing
-    Action* action;
+    std::shared_ptr<Action> action;
     // Action arguments
     Arguments arguments;
 
@@ -154,19 +149,20 @@ struct Context {
         }
         if (flags.size() > 0) {
             for (auto& k_v : flags) {
-                ss << "\n  flag " << k_v.first << ": ";
-                switch (getTypeOfFlag(k_v.second)) {
+                ss << "\n  flag " << k_v.first << ":";
+                switch (getTypeOfFlag(k_v.second.get())) {
                     case FlagType::Bool:
-                        ss << static_cast<Flag<bool>*>(k_v.second)->value;
+                        ss << " " << std::static_pointer_cast<Flag<bool>>(k_v.second)->value;
                         break;
                     case FlagType::String:
-                        ss << static_cast<Flag<std::string>*>(k_v.second)->value;
+                        ss << " " << std::static_pointer_cast<Flag<std::string>>(k_v.second)->value;
                         break;
                     case FlagType::Int:
-                        ss << static_cast<Flag<int>*>(k_v.second)->value;
+                        ss << " " << std::static_pointer_cast<Flag<int>>(k_v.second)->value;
                         break;
                     case FlagType::Double:
-                        ss << static_cast<Flag<double>*>(k_v.second)->value;
+                        ss << " " << std::static_pointer_cast<Flag<double>>(k_v.second)->value;
+                        break;
                 }
             }
         }
@@ -355,7 +351,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
     void setContextFlags(ContextPtr& action_context, const std::string& action_name) {
         // Copy the specific action flags, so that, in case this
         // action has been chained multiple times, each context
-        // will have a different flag instace, thus allowing to
+        // will have a different flag instance, thus allowing to
         // parse and store different flag values - example:
         // `app_name action_1 --flag_a foo + action_1 --flag_a bar`
         for (auto& k_v : actions_[action_name]->flags) {
@@ -364,25 +360,25 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
             if (action_context->flags[k_v.first]) {
                 continue;
             }
-            switch (getTypeOfFlag(k_v.second)) {
+            switch (getTypeOfFlag(k_v.second.get())) {
                 case FlagType::Bool: {
-                    action_context->flags[k_v.first] = new Flag<bool>(
-                        *(static_cast<Flag<bool>*>(k_v.second)));
+                    action_context->flags[k_v.first] = std::make_shared<Flag<bool>>(
+                        *(std::static_pointer_cast<Flag<bool>>(k_v.second)));
                     break;
                 }
                 case FlagType::String: {
-                    action_context->flags[k_v.first] = new Flag<std::string>(
-                        *(static_cast<Flag<std::string>*>(k_v.second)));
+                    action_context->flags[k_v.first] = std::make_shared<Flag<std::string>>(
+                        *(std::static_pointer_cast<Flag<std::string>>(k_v.second)));
                     break;
                 }
                 case FlagType::Int: {
-                    action_context->flags[k_v.first] = new Flag<int>(
-                        *(static_cast<Flag<int>*>(k_v.second)));
+                    action_context->flags[k_v.first] = std::make_shared<Flag<int>>(
+                        *(std::static_pointer_cast<Flag<int>>(k_v.second)));
                     break;
                 }
                 case FlagType::Double: {
-                    action_context->flags[k_v.first] = new Flag<double>(
-                        *(static_cast<Flag<double>*>(k_v.second)));
+                    action_context->flags[k_v.first] = std::make_shared<Flag<double>>(
+                        *(std::static_pointer_cast<Flag<double>>(k_v.second)));
                     break;
                 }
             }
@@ -411,7 +407,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
 
                 if (isActionDefined(action)) {
                     ContextPtr action_context { new Context() };
-                    action_context->flags = std::map<std::string, FlagBase*> {};
+                    action_context->flags = std::map<std::string, std::shared_ptr<FlagBase>> {};
                     setContextFlags(action_context, action);
                     action_context->action = actions_[argv[arg_idx]];
                     action_context->arguments = Arguments {};
@@ -594,13 +590,13 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
     template <typename Type>
     void defineGlobalFlag(std::string aliases, std::string description,
                           Type default_value, FlagCallback<Type> flag_callback) {
-        Flag<Type>* flagp = new Flag<Type>();
-        flagp->aliases = aliases;
-        flagp->value = default_value;
-        flagp->description = description;
-        flagp->flag_callback = flag_callback;
+        auto flagp = std::make_shared<Flag<Type>>();
+        flagp->aliases = std::move(aliases);
+        flagp->value = std::move(default_value);
+        flagp->description = std::move(description);
+        flagp->flag_callback = std::move(flag_callback);
         // Aliases are space separated
-        std::istringstream iss { aliases };
+        std::istringstream iss { flagp->aliases };
         while (iss) {
             std::string tmp;
             iss >> tmp;
@@ -608,7 +604,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
         }
 
         // vlevel is special and we don't want it showing up in the help list
-        if (aliases != "vlevel") {
+        if (flagp->aliases != "vlevel") {
             registered_flags_["global"].push_back(flagp);
         }
     }
@@ -616,16 +612,18 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
     template <typename Type>
     void defineActionFlag(std::string action_name, std::string aliases, std::string description,
                           Type default_value, FlagCallback<Type> flag_callback) {
-        Flag<Type>* flagp = new Flag<Type>();
-        flagp->aliases = aliases;
-        flagp->value = default_value;
-        flagp->description = description;
-        flagp->flag_callback = flag_callback;
+        auto flagp = std::make_shared<Flag<Type>>();
+        flagp->aliases = std::move(aliases);
+        flagp->value = std::move(default_value);
+        flagp->description = std::move(description);
+        flagp->flag_callback = std::move(flag_callback);
         // Aliases are space separated
-        std::istringstream iss { aliases };
+        std::istringstream iss { flagp->aliases };
         std::string tmp;
+        auto &action = actions_[action_name];
+        assert(action);
         while (iss >> tmp) {
-            actions_[action_name]->flags[tmp] = flagp;
+            action->flags[tmp] = flagp;
         }
         registered_flags_[action_name].push_back(flagp);
     }
@@ -635,23 +633,23 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
                       ActionCallback action_callback,
                       ArgumentsCallback arguments_callback,
                       bool variable_arity) {
-        Action* actionp = new Action();
-        actionp->name = name;
-        actionp->arity = arity;
-        actionp->description = description;
-        actionp->help_string_ = help_string;
-        actionp->action_callback = action_callback;
-        actionp->arguments_callback = arguments_callback;
-        actionp->chainable = chainable;
-        actionp->variable_arity = variable_arity;
-        actions_[name] = actionp;
+        auto actionp = std::make_shared<Action>();
+        actionp->name = std::move(name);
+        actionp->arity = std::move(arity);
+        actionp->description = std::move(description);
+        actionp->help_string_ = std::move(help_string);
+        actionp->action_callback = std::move(action_callback);
+        actionp->arguments_callback = std::move(arguments_callback);
+        actionp->chainable = std::move(chainable);
+        actionp->variable_arity = std::move(variable_arity);
+        actions_[actionp->name] = actionp;
     }
 
     template <typename Type>
     Type getFlagValue(std::string name) throw (undefined_flag_error) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
-            return static_cast<Flag<Type>*>(context_mgr_[context_idx]->flags[name])->value;
+            return std::static_pointer_cast<Flag<Type>>(context_mgr_[context_idx]->flags[name])->value;
         }
 
         throw undefined_flag_error { "undefined flag: " + name };
@@ -664,7 +662,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
             throw undefined_flag_error { "undefined flag: " + flag_name };
         }
 
-        return getTypeOfFlag(context_mgr_[context_idx]->flags[flag_name]);
+        return getTypeOfFlag(context_mgr_[context_idx]->flags[flag_name].get());
     }
 
     // ALSO check both contexts
@@ -673,7 +671,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
                                                       flag_validation_error) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
-            Flag<Type>* flagp = static_cast<Flag<Type>*>(
+            auto flagp = std::static_pointer_cast<Flag<Type>>(
                                     context_mgr_[context_idx]->flags[name]);
 
             if (flagp->flag_callback) {
@@ -687,7 +685,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
                 }
             }
 
-            flagp->value = value;
+            flagp->value = std::move(value);
             return;
         }
 
@@ -734,10 +732,10 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
     std::vector<ContextPtr> context_mgr_;
 
     // Registered flags
-    std::map<std::string, Action*> actions_;
+    std::map<std::string, std::shared_ptr<Action>> actions_;
 
     // Maps contexts (global and single actions) to registered flags
-    std::map<std::string, std::vector<FlagBase*>> registered_flags_;
+    std::map<std::string, std::vector<std::shared_ptr<FlagBase>>> registered_flags_;
 
     // Whether CL args have been parsed
     bool parsed_;
@@ -913,13 +911,13 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
         }
 
         for (const auto& flag : registered_flags_["global"]) {
-            writeFlagHelp(flag);
+            writeFlagHelp(flag.get());
         }
 
         if (show_actions_help) {
             std::cout << "\n\nActions:\n";
             for (const auto& action : actions_) {
-                writeActionDescription(action.second);
+                writeActionDescription(action.second.get());
             }
 
             std::cout << "\nFor action specific help run \"" << application_name_
@@ -946,7 +944,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
                       << " specific flags:\n";
             for (const auto& f : registered_flags_[
                                     context_mgr_[current_context_idx_]->action->name]) {
-                writeFlagHelp(f);
+                writeFlagHelp(f.get());
             }
         }
         std::cout << std::endl << std::endl;
