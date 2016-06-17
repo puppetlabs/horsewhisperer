@@ -2,6 +2,14 @@
 
 Change history for HorseWhisperer.
 
+# 0.13.0
+
+Released 2016-06-20
+
+* Fixed memory leaks
+* Add a MultiString type for taking a list of string arguments. See
+the README for caveats about using it.
+
 # 0.12.1
 
 Released 2015-06-01
