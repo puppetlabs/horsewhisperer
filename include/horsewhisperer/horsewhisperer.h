@@ -70,7 +70,7 @@ static const unsigned int DESCRIPTION_MARGIN_RIGHT_DEFAULT = 80;
 // Types
 //
 
-enum class FlagType { Bool, Int, Double, String };
+enum class FlagType { Bool, Int, Double, String, MultiString };
 
 // Callback specified for a given value; called whenever the setFlag()
 // function is executed in order to validate the flag argument - it
@@ -82,6 +82,8 @@ template <typename Type>
 using FlagCallback = std::function<void(Type&)>;
 
 using Arguments = std::vector<std::string>;
+
+using MultiString = std::vector<std::string>;
 
 // Callback specified for a given action; called by the parse()
 // function after completing the parsing, in order to validate its
@@ -162,6 +164,11 @@ struct Context {
                         break;
                     case FlagType::Double:
                         ss << " " << std::static_pointer_cast<Flag<double>>(k_v.second)->value;
+                        break;
+                    case FlagType::MultiString:
+                        for (auto& s : std::static_pointer_cast<Flag<MultiString>>(k_v.second)->value) {
+                            ss << " " << s;
+                        }
                         break;
                 }
             }
@@ -276,6 +283,8 @@ static FlagType getTypeOfFlag(const FlagBase* flagp) {
         flag_type = FlagType::Int;
     } else if (dynamic_cast<const Flag<double>*>(flagp)) {
         flag_type = FlagType::Double;
+    } else if (dynamic_cast<const Flag<MultiString>*>(flagp)) {
+        flag_type = FlagType::MultiString;
     } else {
         // We only support the types in the FlagType enum...
         assert(false);
@@ -380,6 +389,10 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
                     action_context->flags[k_v.first] = std::make_shared<Flag<double>>(
                         *(std::static_pointer_cast<Flag<double>>(k_v.second)));
                     break;
+                }
+                case FlagType::MultiString: {
+                    action_context->flags[k_v.first] = std::make_shared<Flag<MultiString>>(
+                        *(std::static_pointer_cast<Flag<MultiString>>(k_v.second)));
                 }
             }
 
@@ -835,16 +848,26 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
 
         FlagType flag_type = checkAndGetTypeOfFlag(flagname);
 
-        std::string value {};
+        if (flag_type == FlagType::MultiString) {
+            MultiString value {};
+            while (argv[i+1] && argv[i+1][0] != '-'
+                   && !isDelimiter(argv[i+1])
+                   && !isActionDefined(argv[i+1])) {
+                value.emplace_back(argv[++i]);
+            }
+            return setAndValidateMultiFlag(flag_type, flagname, std::move(value));
+        } else {
+            std::string value {};
 
-        if (k_v != std::string::npos) {
-            value = &argv[i][k_v];
-        } else if (flag_type != FlagType::Bool && argv[++i]) {
-            // bool shouldn't try and take an argument from argv
-            value = argv[i];
+            if (k_v != std::string::npos) {
+                value = &argv[i][k_v];
+            } else if (flag_type != FlagType::Bool && argv[++i]) {
+                // bool shouldn't try and take an argument from argv
+                value = argv[i];
+            }
+
+            return setAndValidateFlag(flag_type, flagname, value);
         }
-
-        return setAndValidateFlag(flag_type, flagname, value);
     }
 
     ParseResult setAndValidateFlag(FlagType flag_type, std::string flagname,
@@ -896,6 +919,21 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
         }
 
         std::cout << flagname << " is not of a valid flag type." << std::endl;
+        return ParseResult::FAILURE;
+    }
+
+    ParseResult setAndValidateMultiFlag(FlagType flag_type, std::string flagname,
+                                        MultiString value) {
+        if (flag_type == FlagType::MultiString) {
+            if (value.empty()) {
+                std::cout << "Missing values for flag: " << flagname << std::endl;
+                return ParseResult::FAILURE;
+            }
+
+            setFlag<MultiString>(flagname, std::move(value));
+            return ParseResult::OK;
+        }
+        std::cout << flagname << " is not a valid multi-value flag type." << std::endl;
         return ParseResult::FAILURE;
     }
 
@@ -973,6 +1011,10 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
                 break;
             case FlagType::Double:
                 arg = " <float>";
+                break;
+            case FlagType::MultiString:
+                arg = " <str>...";
+                break;
         }
 
         while (aliases_stream >> alias) {

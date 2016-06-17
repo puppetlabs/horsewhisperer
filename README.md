@@ -80,6 +80,12 @@ Supported flag types are:
 | Int | `int` |
 | Double | `double` |
 | String | `std::string` |
+| MultiString | `std::vector<std::string>` |
+
+MultiString allows multiple values to be specified, separated by spaces. It takes all values
+following the flag until encountering another flag or action. That comes with a few caveats for users:
+ * A MultiString flag cannot accept values with leading hyphens (i.e. -3.14)
+ * A MultiString flag should follow any arguments to an action
 
 If the incorrect type is used - such as `SetFlag<bool>("flag", true); GetFlag<double>("flag")` - you
 may encounter memory corruption.
