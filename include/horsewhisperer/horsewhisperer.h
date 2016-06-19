@@ -189,11 +189,11 @@ static void DefineActionFlag(std::string action_name,
                              FlagCallback<Type> flag_callback) __attribute__ ((unused));
 static bool IsActionFlag(std::string action, std::string flagname) __attribute__ ((unused));
 template <typename Type>
-static Type GetFlag(std::string flag_name) __attribute__ ((unused));
+static Type GetFlag(std::string const& flag_name) __attribute__ ((unused));
 // Throws undefined_flag_error in case the specified flag is unknown
-static FlagType GetFlagType(std::string flag_name) __attribute__ ((unused));
+static FlagType GetFlagType(std::string const& flag_name) __attribute__ ((unused));
 template <typename Type>
-static void SetFlag(std::string flag_name, Type value) __attribute__ ((unused));
+static void SetFlag(std::string const& flag_name, Type value) __attribute__ ((unused));
 static void DefineAction(std::string action_name,
                          int arity,
                          bool chainable,
@@ -205,7 +205,7 @@ static void DefineAction(std::string action_name,
 static void SetAppName(std::string name) __attribute__ ((unused));
 static void SetHelpBanner(std::string banner) __attribute__ ((unused));
 static void SetVersion(std::string version, std::string short_flag) __attribute__ ((unused));
-static void SetDelimiters(std::vector<std::string> delimiters) __attribute__ ((unused));
+static void SetDelimiters(std::vector<std::string> const& delimiters) __attribute__ ((unused));
 static ParseResult Parse(int argc, char** argv) __attribute__ ((unused));
 static void ShowHelp(bool show_actions_help = true) __attribute__ ((unused));
 static void ShowVersion() __attribute__ ((unused));
@@ -646,7 +646,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
     }
 
     template <typename Type>
-    Type getFlagValue(std::string name) throw (undefined_flag_error) {
+    Type getFlagValue(std::string const& name) throw (undefined_flag_error) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
             return std::static_pointer_cast<Flag<Type>>(context_mgr_[context_idx]->flags[name])->value;
@@ -667,8 +667,8 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
 
     // ALSO check both contexts
     template <typename Type>
-    void setFlag(std::string name, Type value) throw (undefined_flag_error,
-                                                      flag_validation_error) {
+    void setFlag(std::string const& name, Type value) throw (undefined_flag_error,
+                                                             flag_validation_error) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
             auto flagp = std::static_pointer_cast<Flag<Type>>(
@@ -1051,7 +1051,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
         }
     }
 
-    int getContextIdxIfDefined(std::string name) {
+    int getContextIdxIfDefined(std::string const& name) {
         if (context_mgr_[current_context_idx_]->flags.find(name)
                 != context_mgr_[current_context_idx_]->flags.end()) {
             return current_context_idx_;
@@ -1101,27 +1101,27 @@ static void DefineActionFlag(std::string action_name,
 }
 
 template <typename Type>
-static Type GetFlag(std::string flag_name) {
+static Type GetFlag(std::string const& flag_name) {
     return HorseWhisperer::Instance().getFlagValue<Type>(flag_name);
 }
 
-static FlagType GetFlagType(std::string flag_name) {
+static FlagType GetFlagType(std::string const& flag_name) {
     return HorseWhisperer::Instance().checkAndGetTypeOfFlag(flag_name);
 }
 
 template <typename Type>
-static void SetFlag(std::string flag_name, Type value) {
-    HorseWhisperer::Instance().setFlag<Type>(flag_name, value);
+static void SetFlag(std::string const& flag_name, Type value) {
+    HorseWhisperer::Instance().setFlag<Type>(flag_name, std::move(value));
 }
 
 static void DefineAction(std::string action_name,
-                           int arity,
-                           bool chainable,
-                           std::string description,
-                           std::string help_string,
-                           ActionCallback action_callback,
-                           ArgumentsCallback arguments_callback = nullptr,
-                           bool variable_arity = false) {
+                         int arity,
+                         bool chainable,
+                         std::string description,
+                         std::string help_string,
+                         ActionCallback action_callback,
+                         ArgumentsCallback arguments_callback = nullptr,
+                         bool variable_arity = false) {
     HorseWhisperer::Instance().defineAction(action_name,
                                             arity,
                                             chainable,
@@ -1148,7 +1148,7 @@ static void SetVersion(std::string version_string, std::string short_flag_string
     HorseWhisperer::Instance().setVersionString(version_string, short_flag_string);
 }
 
-static void SetDelimiters(std::vector<std::string> delimiters) {
+static void SetDelimiters(std::vector<std::string> const& delimiters) {
     HorseWhisperer::Instance().setDelimiters(delimiters);
 }
 

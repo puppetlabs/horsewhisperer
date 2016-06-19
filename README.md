@@ -72,6 +72,18 @@ At any point after declaring a flag it's value can be set or looked up by the fo
     template <typename FlagType>
     bool SetFlag(std::string flag_name, FlagType value)
 
+Supported flag types are:
+
+| FlagType | primitive |
+| --- | --- |
+| Bool | `bool` |
+| Int | `int` |
+| Double | `double` |
+| String | `std::string` |
+
+If the incorrect type is used - such as `SetFlag<bool>("flag", true); GetFlag<double>("flag")` - you
+may encounter memory corruption.
+
 The Horse Whisperer will throw an "undefined_flag_error" exception when trying to apply GetFlag or
 SetFlag to an undefined flag.
 
