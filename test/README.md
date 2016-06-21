@@ -13,7 +13,7 @@ It must be compiled; the executable must be named `example` and stored in the
 Unit Tests
 ---
 
-The unit tests for Horse Whisperere are based on the
+The unit tests for Horse Whisperer are based on the
 [Catch framework](https://github.com/philsquared/Catch).
 
 To run the tests, simply execute:

@@ -72,6 +72,24 @@ At any point after declaring a flag it's value can be set or looked up by the fo
     template <typename FlagType>
     bool SetFlag(std::string flag_name, FlagType value)
 
+Supported flag types are:
+
+| FlagType | primitive |
+| --- | --- |
+| Bool | `bool` |
+| Int | `int` |
+| Double | `double` |
+| String | `std::string` |
+| MultiString | `std::vector<std::string>` |
+
+MultiString allows multiple values to be specified, separated by spaces. It takes all values
+following the flag until encountering another flag or action. That comes with a few caveats for users:
+ * A MultiString flag cannot accept values with leading hyphens (i.e. -3.14)
+ * A MultiString flag should follow any arguments to an action
+
+If the incorrect type is used - such as `SetFlag<bool>("flag", true); GetFlag<double>("flag")` - you
+may encounter memory corruption.
+
 The Horse Whisperer will throw an "undefined_flag_error" exception when trying to apply GetFlag or
 SetFlag to an undefined flag.
 

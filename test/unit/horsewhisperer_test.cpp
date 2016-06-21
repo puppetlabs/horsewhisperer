@@ -138,10 +138,16 @@ TEST_CASE("GetFlagType", "[type]") {
         REQUIRE(HW::GetFlagType("global-double") == HW::FlagType::Double);
     }
 
-    SECTION("correctly gives string type") {
+    SECTION("correctly gives String type") {
         HW::DefineGlobalFlag<std::string>("global-string", "test", "bar", nullptr);
         HW::SetFlag<std::string>("global-string", "foo");
         REQUIRE(HW::GetFlagType("global-string") == HW::FlagType::String);
+    }
+
+    SECTION("correctly gives MultiString type") {
+        HW::DefineGlobalFlag<std::vector<std::string>>("global-string", "test", {"bar"}, nullptr);
+        HW::SetFlag<std::vector<std::string>>("global-string", {"foo"});
+        REQUIRE(HW::GetFlagType("global-string") == HW::FlagType::MultiString);
     }
 
     SECTION("it throws when trying to set an undefined flag") {
@@ -568,6 +574,64 @@ TEST_CASE("parse", "[parse]") {
             }
 
             REQUIRE(HW::GetFlag<double>("double-flag") == -3.14);
+        }
+    }
+
+    SECTION("it parses MultiStrings") {
+        HW::DefineGlobalFlag<std::vector<std::string>>("multi-flag", "no useful description",
+                                                       {}, nullptr);
+        HW::DefineGlobalFlag<bool>("other-flag", "stuff", false, nullptr);
+        HW::DefineAction("two_args_action", 2, false, "test action", "2 args required!",
+                         nullptr);
+
+        SECTION("single value") {
+            const char* args[] = { "test-app", "test-action", "--multi-flag",
+                "3.14", nullptr };
+            REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::OK);
+            REQUIRE(HW::GetFlag<std::vector<std::string>>("multi-flag") == std::vector<std::string>({"3.14"}));
+            REQUIRE(HW::GetFlag<bool>("other-flag") == false);
+        }
+
+        SECTION("multiple values") {
+            const char* args[] = { "test-app", "test-action", "--multi-flag",
+                "some", "words", "--other-flag", nullptr };
+            REQUIRE(HW::Parse(6, const_cast<char**>(args)) == HW::ParseResult::OK);
+            REQUIRE(HW::GetFlag<std::vector<std::string>>("multi-flag") == std::vector<std::string>({"some", "words"}));
+            REQUIRE(HW::GetFlag<bool>("other-flag") == true);
+        }
+
+        SECTION("multiple actions") {
+            const char* args[] = { "test-app", "test-action", "--multi-flag",
+                "some", "words", "two_args_action", "foo", "bar", nullptr };
+            REQUIRE(HW::Parse(8, const_cast<char**>(args)) == HW::ParseResult::OK);
+            REQUIRE(HW::GetFlag<std::vector<std::string>>("multi-flag") == std::vector<std::string>({"some", "words"}));
+            REQUIRE(HW::GetFlag<bool>("other-flag") == false);
+        }
+
+        SECTION("trailing short-flag") {
+            const char* args[] = { "test-app", "test-action", "--multi-flag",
+                "some", "words", "-vvv", nullptr };
+            REQUIRE(HW::Parse(6, const_cast<char**>(args)) == HW::ParseResult::OK);
+            REQUIRE(HW::GetFlag<std::vector<std::string>>("multi-flag") == std::vector<std::string>({"some", "words"}));
+            REQUIRE(HW::GetFlag<int>("vlevel") == 3);
+        }
+
+        SECTION("caveat: hyphen values") {
+            const char* args[] = { "test-app", "test-action", "--multi-flag",
+                "-3.14", nullptr };
+            REQUIRE(HW::Parse(4, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
+        }
+
+        SECTION("caveat: precede arguments") {
+            const char* args[] = { "test-app", "two_args_action", "--multi-flag",
+                "some", "words", "one", "two", nullptr };
+            REQUIRE(HW::Parse(7, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
+        }
+
+        SECTION("caveat: interleaved arguments") {
+            const char* args[] = { "test-app", "two_args_action", "one", "--multi-flag",
+                "some", "words", "two", nullptr };
+            REQUIRE(HW::Parse(7, const_cast<char**>(args)) == HW::ParseResult::FAILURE);
         }
     }
 }
