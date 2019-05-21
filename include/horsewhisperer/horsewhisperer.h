@@ -659,7 +659,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
     }
 
     template <typename Type>
-    Type getFlagValue(std::string const& name) throw (undefined_flag_error) {
+    Type getFlagValue(std::string const& name) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
             return std::static_pointer_cast<Flag<Type>>(context_mgr_[context_idx]->flags[name])->value;
@@ -680,8 +680,7 @@ class HORSEWHISPERER_EXPORT HorseWhisperer {
 
     // ALSO check both contexts
     template <typename Type>
-    void setFlag(std::string const& name, Type value) throw (undefined_flag_error,
-                                                             flag_validation_error) {
+    void setFlag(std::string const& name, Type value) {
         int context_idx = getContextIdxIfDefined(name);
         if (context_idx != NO_CONTEXT_IDX) {
             auto flagp = std::static_pointer_cast<Flag<Type>>(
